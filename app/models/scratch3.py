@@ -2,7 +2,14 @@
 
 from sqlmodel import Field, Column, TIMESTAMP, text, select, SQLModel
 from app.database.session import Session, engine
-from app.models.scratch2 import *
+# from app.models.scratch2 import *
+
+from app.models.ingredient import *
+from app.models.ingredient_image import *
+from app.models.uom import *
+from app.models.image import *
+from app.models.user import *
+from app.models.organisation import *
 
 with Session(engine) as session:
     statement = (

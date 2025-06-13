@@ -1,21 +1,13 @@
 # image.py
 
-from __future__ import annotations # Postpone evaluation of type hints to prevent circular import issues
+# from __future__ import annotations # Postpone evaluation of type hints to prevent circular import issues
 
 from datetime import datetime, timezone
 from typing import Optional, List
 
 from sqlmodel import SQLModel, Field, Relationship
 
-from app.models.organisation import Organisation
-
-
-class Image(SQLModel, table=True):
-    """
-    Represents an image entry in the database.
-    Stores metadata about an image, its path, and who uploaded it.
-    """
-    image_id: Optional[int] = Field(default=None, primary_key=True)
+class ImageBase(SQLModel):  # common elements that will be used in both the table model and read model
     file_name: str = Field(max_length=255, nullable=False)
     file_ext: str = Field(max_length=10, nullable=False, description='File extension')
     mime_type: str = Field(max_length=50, nullable=False)
@@ -46,33 +38,26 @@ class Image(SQLModel, table=True):
         description='Used as S3, or other cloud store, document key. UUID avoids need for checking if name already exists.'
     )
 
+class Image(ImageBase, table=True):  # inherit the image base
+    """
+    Represents an image entry in the database.
+    Stores metadata about an image, its path, and who uploaded it.
+    """
+    image_id: Optional[int] = Field(default=None, primary_key=True)
 
-
-    # # Relationship to the IngredientImage linking table (assuming it still exists)
-    # ingredients: List["Ingredient"] = Relationship( # Changed to direct type hint for Ingredient
-    #     link_model="IngredientImage", # Use string literal for link_model too for safety
-    #     back_populates="images"
-    # )
+    # define relationships to the TABLE as these can't be defined within the Base class
+    organisation: Optional["Organisation"] = Relationship(back_populates="images")
     # define relationship to the IngredientImage linking table
-    ingredient_links: List['IngredientImageLink'] = Relationship(back_populates="ingredient")
+    ingredient_links: List["Ingredient_Image"] = Relationship(back_populates="image")
 
 
 
-class ImageRead(SQLModel):
+class ImageRead(ImageBase):
     """
     Pydantic model for exposing Image data in API responses.
-    """
+        Contains all API user-friendly data, excluding the relationship objects
+        """
     image_id: int
-    file_name: str
-    file_ext: str
-    mime_type: str
-    file_size: int
-    alt_text: Optional[str]
-    caption: Optional[str]
-    created_timestamp: datetime
-    modified_timestamp: datetime
-    organisation_id: Optional[int]
-    s3_key: str
 
 
 
