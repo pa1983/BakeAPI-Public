@@ -1,14 +1,18 @@
 #ingredient.py
-from __future__ import annotations # Postpone evaluation of type hints to prevent circular import issues
+# from __future__ import annotations # Postpone evaluation of type hints to prevent circular import issues
 
 from typing import Optional, List
 from datetime import datetime, timezone
 
+from pydantic import computed_field
 from sqlmodel import SQLModel, Field, Relationship
 
-from app.models.ingredient_image import IngredientImage
+from app.models.ingredient_image import Ingredient_Image, Ingredient_ImageRead
 from app.models.organisation import Organisation, OrganisationRead
 from app.models.uom import unit_of_measure
+
+from app.models.image import ImageRead
+
 
 class Ingredient(SQLModel, table=True):
     ingredient_id: int = Field(default=None, primary_key=True)
@@ -24,14 +28,15 @@ class Ingredient(SQLModel, table=True):
 
     # note use of string literal below to avoid circular import errors if use direct class reference
     standard_uom: unit_of_measure = Relationship(back_populates="ingredients")
-    organisation: Optional[Organisation] = Relationship(back_populates="ingredients")
+    organisation: Optional["Organisation"] = Relationship(back_populates="ingredients")
 
     # Direct many-to-many relationship to Image via IngredientImage link model
     # 'images' is the new relationship attribute on Ingredient
-    image_links: List["IngredientImage"] = Relationship(
+    image_links: List["Ingredient_Image"] = Relationship(
 
         back_populates="ingredient" # relates the name of the relationship on the Image model
     )
+    
 
 
 class IngredientRead(SQLModel):
@@ -43,7 +48,14 @@ class IngredientRead(SQLModel):
     created_timestamp: datetime
     modified_timestamp: datetime
 
-    standard_uom: unit_of_measure
-    organisation: Optional[OrganisationRead]
+    standard_uom: unit_of_measure  # passes through a full unit of measure class object
+    organisation: Optional[OrganisationRead]  # optionally passes through an organisation read instance
 
-    images: List["ImageRead"] = [] # Initialise as empty list for default serialization
+    image_links: List[Ingredient_ImageRead] = []
+    # todo - consider??  image_links works as-is.  Do I need to use the computed_field and property?  Might be useful to flatten?  or just extra complexity?
+
+    @computed_field(return_type=List[ImageRead]) # Pydantic decorator - used to define a property whose value is dynamically computed from other fields in the model (in this case, after then main data is loaded)
+    @property  # makes the images function accessible as if it were a class attribute
+    def images(self) -> List[ImageRead]:
+        sorted_image_links = sorted(self.image_links, key=lambda link: link.sort_order)  # apply sort order
+        return [link.image for link in sorted_image_links if link.image]   # return only the image instance, in a sorted list

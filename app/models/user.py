@@ -1,6 +1,6 @@
 #user.py
 
-from __future__ import annotations
+# from __future__ import annotations
 from typing import List, Optional
 from datetime import datetime
 from sqlmodel import Field, SQLModel, Relationship, Column, TIMESTAMP, text
