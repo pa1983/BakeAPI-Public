@@ -1,17 +1,33 @@
+#core/auth.py
 # testing cognito - get access token without using front end login for testing API endpoints
 from typing import Dict, Any
 
 import boto3
-from app.models.user import User, Role, Organisation
+from fastapi import Depends, status
+from sqlalchemy.orm import selectinload
+
+from app.models.user import User, Organisation
+from app.models.role import Role, RolePermissionLink
 from sqlmodel import Session, select
 from fastapi_cognito import CognitoAuth, CognitoSettings
 
 from app.core.config import settings
-from app.database.session import engine
+from app.database.session import engine, get_session
+
+
+# Note the unused imports are required below to ensure that model classes are available for use by type checking when
+# classes are specified as string literals to avoid circular dependencies
+
+from app.models.ingredient import Ingredient, Ingredient_Image, IngredientRead
+from app.models.ingredient_image import *
+from app.models.uom import *
+from app.models.image import *
+from app.models.user import *
+from app.models.organisation import *
+from app.models.permission import Permission
 
 
 class MyCognitoSettings(CognitoSettings):
-
     userpools: Dict[str, Any] = {
         "bokeonomics_userpool": {
             "region": settings.AWS_REGION,
@@ -30,6 +46,7 @@ cognito_auth = CognitoAuth(
     settings=cogito_settings
 )
 
+# CognitoToken(origin_jti='9eee907d-660a-4e08-aa0c-4f722cf07ae0', cognito_id='d2e5a494-2061-7025-bc08-2c55e8066af6', event_id='cc506764-57de-4464-b148-623b957f98d6', token_use='access', scope='aws.cognito.signin.user.admin', auth_time=1750164289, iss=HttpUrl('https://cognito-idp.eu-west-1.amazonaws.com/eu-west-1_l4pSAAZYP'), exp=1750167889, iat=1750164289, jti='c7e2d217-b1a2-42e1-ac47-4cbd1d5cc39a', client_id='4ph7lbuua09u9qstvlc6mf2i4', username='d2e5a494-2061-7025-bc08-2c55e8066af6')
 
 def get_cognito_tokens(client_id, username, password):
     client = boto3.client('cognito-idp')
@@ -51,8 +68,7 @@ def get_cognito_tokens(client_id, username, password):
         return None
 
 
-def test_get_tokens():
-
+def get_tokens_for_testing():
     tokens = get_cognito_tokens(settings.AWS_COGNITO_APP_CLIENT_ID,
                                 settings.AWS_COGNITO_TEST_USERNAME,
                                 settings.AWS_COGNITO_TEST_PASSWORD)
@@ -62,32 +78,12 @@ def test_get_tokens():
         print("ID Token:", tokens.get('IdToken'))
         print("Access Token:", tokens.get('AccessToken'))
         print("Refresh Token:", tokens.get('RefreshToken'))
-
-        # handle ID jwt
-        import jwt
-
-        decoded_token = jwt.decode(tokens.get('IdToken'),
-                                   options={"verify_signature": True, "verify_aud": True, "verify_iss": True},
-                                   algorithms=['RS256'])
-        cognito_sub = decoded_token.get('sub')
-        # use this sub to lookup user ID from database - with user will know both the user and the org they're associated with
-
     else:
         print("Failed to get tokens.")
 
 
-def get_user(cognito_sub_id: str) -> User:
-    # get current user and organisation objects from signed-in user details.
-    with Session(engine) as session:
-        user = session.exec(select(User, Organisation).where(User.cognito_sub_id == cognito_sub_id))
-        res = user.first()
-    print(res)
-    return res
-
-
 if __name__ == '__main__':
-    # get_user('d2e5a494-2061-7025-bc08-2c55e8066af6')
-    test_get_tokens()  # used to get access ID token for use in postman until get front end set up to generate tokens.  todo- figure out how to get tokens in postman for testing
+    get_tokens_for_testing()
 # todo - write tests to ensure that the test username creates valid token.  Pass in invalid user and password to confirm auth rejects correctly also.
 
 # ID Token: eyJraWQiOiJMaURmdVdmWHh2RlRUMXAxZlJyYTRiNkw0SkwzdHdwU2tWbTYyT1wvczVmRT0iLCJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJkMmU1YTQ5NC0yMDYxLTcwMjUtYmMwOC0yYzU1ZTgwNjZhZjYiLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiaXNzIjoiaHR0cHM6XC9cL2NvZ25pdG8taWRwLmV1LXdlc3QtMS5hbWF6b25hd3MuY29tXC9ldS13ZXN0LTFfbDRwU0FBWllQIiwiY29nbml0bzp1c2VybmFtZSI6ImQyZTVhNDk0LTIwNjEtNzAyNS1iYzA4LTJjNTVlODA2NmFmNiIsIm9yaWdpbl9qdGkiOiI5YWQwNzJkOS1hZjg3LTQ1NWQtYjdjOS0xZGFjMGEwNWIwOTEiLCJhdWQiOiI0cGg3bGJ1dWEwOXU5cXN0dmxjNm1mMmk0IiwiZXZlbnRfaWQiOiJhZWM0N2M4MC04MTZmLTRhMDEtOGYwNi0zMGExNDcwNzE5MWYiLCJ0b2tlbl91c2UiOiJpZCIsImF1dGhfdGltZSI6MTc0OTIyMTU4MiwiZXhwIjoxNzQ5MjI1MTgyLCJpYXQiOjE3NDkyMjE1ODIsImp0aSI6ImI3Mzg1ZjRmLTljYjQtNGU4Yi04OTM4LTZlZDg4YWNhMjAzMSIsImVtYWlsIjoicGExOTgzQGdtYWlsLmNvbSJ9.bIdE0frO3bMGYjELQLs6A_LYS9BayfsK3qsjzJGjMKY-T6884z90Kgq35G4OL0K3AJPtw7GB25wMuE03b0EHcv0y3tM5w8r_V0-F2G35YZcyGq9AOmGJbU9kazre7Hx96OsT14MGbzXvZJNqupMpRo9bffHPNk_Qp5yAKBzWtVWgAvSi9-1E8a_FhX_VaE6KFwYpRg1PP0K-y6qEHyy-WZm1XCB62lfnpdz3n_KZF9eXzNx1n4bvJaneLRbvDOYadAzBTzpQmaiMK2bFn_i-BUQK9qTmSUS79AMslT-3HRKFDSIlBDa3HIsGSMRol4vV5gQCpyEoJq7XF5blj_mOZA

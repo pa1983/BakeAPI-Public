@@ -1,61 +1,17 @@
 #user.py
 
-# from __future__ import annotations
-from typing import List, Optional
+from typing import Optional
 from datetime import datetime
 from sqlmodel import Field, SQLModel, Relationship, Column, TIMESTAMP, text
 
 from app.models.organisation import Organisation
+from app.models.role import Role
+from app.models.title import Title
+from app.models.role import RoleRead
 
 
-class RolePermissionLink(SQLModel, table=True):
-    __tablename__ = "role_permission"  # Explicitly set table name for the link table
-    role_id: Optional[int] = Field(
-        default=None, foreign_key="role.role_id", primary_key=True
-    )
-    permission_id: Optional[int] = Field(
-        default=None, foreign_key="permission.permission_id", primary_key=True
-    )
+class UserBase(SQLModel):
 
-
-class Role(SQLModel, table=True):
-    role_id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(max_length=255)
-    organisation_id: Optional[int] = Field(
-        default=None, foreign_key="organisation.organisation_id"
-    )
-    organisation: Optional[Organisation] = Relationship(back_populates="roles")
-    users: List["User"] = Relationship(back_populates="role")
-    permissions: List["Permission"] = Relationship(
-        back_populates="roles", link_model=RolePermissionLink
-    )
-
-
-class Permission(SQLModel, table=True):
-    permission_id: int = Field(primary_key=True)
-    permission_name: str = Field(max_length=255)
-    permission_description: str = Field(max_length=255)
-    roles: List["Role"] = Relationship(back_populates="permissions", link_model=RolePermissionLink)
-
-
-class Title(SQLModel, table=True):
-    short_title: str = Field(primary_key=True, max_length=255)
-    full_title: str = Field(max_length=255)
-    notes: Optional[str] = Field(
-        default=None, max_length=255, description="explanation of meaning of title")
-    sort_order: int = Field(default=10)
-
-    users: List["User"] = Relationship(back_populates="title")
-
-
-class User(SQLModel, table=True):
-    __tablename__ = "user"
-
-    cognito_sub_id: str = Field(
-        primary_key=True,
-        max_length=255,
-        description="cognito user pool subject ID - use as unique user ID",
-    )
     email_address: str = Field(
         max_length=255,
         unique=True,
@@ -94,7 +50,32 @@ class User(SQLModel, table=True):
                          server_default=text("CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")),
     )
 
-    title: Optional[Title] = Relationship(back_populates="users")
-    role: Optional[Role] = Relationship(back_populates="users")
-
     organisation_id: int = Field(foreign_key="organisation.organisation_id")
+
+
+class User(UserBase, table=True):
+    cognito_sub_id: str = Field(
+        primary_key=True,
+        max_length=255,
+        description="cognito user pool subject ID - use as unique user ID",
+    )
+    __tablename__ = "user"
+
+
+    title: Optional["Title"] = Relationship(back_populates="users")
+    role: Optional["Role"] = Relationship(back_populates="users")
+    organisation: Optional[Organisation] = Relationship(back_populates="users")
+
+class UserReadProfile(UserBase):
+    # todo - consider which elements to import, and which relationships to include, and how.
+    # todo - may want different userRead functions for different purposes to minimise unnecessary data transfer
+    pass
+
+class UserReadSystem(UserBase):
+    """
+    For use by API only - not to be passed back to user/front end.
+    Contains system data such as permissions lists for validating RBAC
+
+    """
+    cognito_sub_id: str
+    role: Optional[RoleRead] = None

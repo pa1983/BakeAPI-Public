@@ -22,24 +22,26 @@ CommonRouter: APIRouter = APIRouter()
                   status_code=status.HTTP_200_OK,  # pre-define the success status code.  Only gets overridden if there's an HTTP error thrown
                   response_model=List[unit_of_measure])
 async def uom_get(session: Session = Depends(get_session),
-                  current_user: User = Depends(get_current_user)):
+                  current_user: User = Depends(get_current_user))->List[unit_of_measure]:
     # todo - come back and get get_user working - going to be fundamental to all subsequent queries
     # ,
     #               current_user: User = Depends(get_user)
     #               ) -> List[unit_of_measure]:
     """
-    Get a list of all units of measure; will be stored in app/FE state
+    Get a list of all units of measure; will be stored in app/front-end state
     store for use in choosing UOM for recipes, ingredients, and used in
     front-end calculations
     
     :return: 
     """
     try:
-        res = session.exec(select(unit_of_measure)).all()
+        res =  session.exec(select(unit_of_measure)).all()
+
         return res
     except Exception as e:
         print(f"Error fetching units of measure: {e}")
-        # TODO: Add proper error handling, e.g., raise HTTPException
+        raise HTTPException(status_code=404, detail=str(e))
+
 
 @CommonRouter.get("/title",
                   status_code=status.HTTP_200_OK,

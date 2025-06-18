@@ -1,7 +1,4 @@
 # image.py
-
-# from __future__ import annotations # Postpone evaluation of type hints to prevent circular import issues
-
 from datetime import datetime, timezone
 from typing import Optional, List
 

@@ -15,6 +15,7 @@ class Organisation(SQLModel, table=True):
     # The 'ingredients' here matches back_populates="ingredients" in Ingredient model
     ingredients: List["Ingredient"] = Relationship(back_populates="organisation")
     images: List["Image"] = Relationship(back_populates="organisation")
+    users: List["User"] = Relationship(back_populates="organisation")
 
 class OrganisationRead(SQLModel):
     organisation_id: int

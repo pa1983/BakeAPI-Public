@@ -53,6 +53,7 @@ class IngredientRead(SQLModel):
 
     image_links: List[Ingredient_ImageRead] = []
     # todo - consider??  image_links works as-is.  Do I need to use the computed_field and property?  Might be useful to flatten?  or just extra complexity?
+    # todo -  the @property approad places the image in a sorted lost that can be iterated through, but the sort_order isn't explicitly displayed.  Which is best suited?
 
     @computed_field(return_type=List[ImageRead]) # Pydantic decorator - used to define a property whose value is dynamically computed from other fields in the model (in this case, after then main data is loaded)
     @property  # makes the images function accessible as if it were a class attribute
