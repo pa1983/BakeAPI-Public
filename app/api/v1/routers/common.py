@@ -1,15 +1,19 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, status, HTTPException, UploadFile, File
 from sqlmodel import select, bindparam, Session
 
 from app.api.v1.routers import organisation
+from app.core.logging_config import logger
 from app.database.session import get_session
+from app.models.common import ApiResponse
 from app.models.uom import unit_of_measure
 
 from app.core.auth import cognito_auth
 from app.dependencies.user_dependencies import get_current_user
 from app.models.user import User, Organisation, Title
+from app.services import s3_handler
+from app.services.s3_handler import delete_s3_object
 
 # fetch list of UOMs, will be fed into state management in the app and used in drop downs
 # etc when selecting a UOM for an ingredient/recipe/buyable item etc
@@ -76,3 +80,15 @@ async def user_info(current_user: User = Depends(get_current_user),
                     .first())
     print(f'Org name: {organisation.organisation_name}')
     return current_user
+
+# todo - make different versions for different file upload types.  Specific version for image, invoice, price list etc
+@CommonRouter.post("/file_upload")
+async def file_upload_post(file: UploadFile = File(...)) -> ApiResponse[None]:
+    try:
+        s3_key = s3_handler.push_UploadFile_to_s3(file, directory="invoice")  # todo - consider enum-ing this
+        logger.debug(f"File pushed to S3: {s3_key}")
+        delete_s3_object(s3_key)
+        return ApiResponse(data=None, message=f"File uploaded successfully {file.filename} with s3 key {s3_key}")
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, message=f"Error uploading file: {e}")
+

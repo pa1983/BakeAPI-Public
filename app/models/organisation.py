@@ -1,10 +1,6 @@
 # from __future__ import annotations # Postpone evaluation of type hints to prevent circular import issues
 from typing import List, Optional
-from datetime import datetime
-from sqlmodel import Field, SQLModel, Relationship, Column, TIMESTAMP, text
-
-# from app.models.user import Role
-
+from sqlmodel import Field, SQLModel, Relationship
 
 class Organisation(SQLModel, table=True):
     organisation_id: Optional[int] = Field(default=None, primary_key=True)

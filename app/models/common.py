@@ -8,7 +8,7 @@ class ApiResponse(BaseModel, Generic[T]):
     """
     Standard response type to be used by most API response.
     Message should be overridden, as required, to show a meaningful, user-friendly message that can be
-    flashed/displayed direcrtly to the user
+    flashed/displayed directly to the user
 
     ApiResponse class can hold any type of data in its data field.
     The actual type will be specified when an ApiResponse object is created
@@ -19,6 +19,6 @@ class ApiResponse(BaseModel, Generic[T]):
 
     # todo - for international translations, consider how this message can be translated as required
     """
-    data: T  # generic data type to store any resonse data type
+    data: T|None  # generic data type to store any resonse data type.  Allow none for successful POST of data, etc
     message: str = "Operation Successful"  # Default message; can be overridden before sending response
     status_code: int = 200  # Default status; can be overridden before sending

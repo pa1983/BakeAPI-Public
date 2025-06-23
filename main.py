@@ -1,13 +1,15 @@
-from __future__ import annotations # Postpone evaluation of type hints to prevent circular import issues
+from __future__ import annotations  # Postpone evaluation of type hints to prevent circular import issues
 # todo - check all models are imported as per last gemini query
 
 from fastapi import FastAPI, Depends
+from fastapi_pagination import add_pagination
 from fastapi.security import OAuth2PasswordBearer
 from fastapi_cognito import CognitoAuth, CognitoToken
 from starlette.middleware.cors import CORSMiddleware
 from starlette_context import plugins
 from starlette_context.middleware import RawContextMiddleware
 
+from app.core.logging_config import logger
 from app.api.v1.routers.admin import AdminRouter
 from app.api.v1.routers.common import CommonRouter
 from app.api.v1.routers.ingredient import IngredientRouter
@@ -21,37 +23,44 @@ from app.models.ingredient import Ingredient
 from app.models.uom import unit_of_measure
 from app.models.organisation import Organisation
 
+app = FastAPI(title="BakeAPI")
+
+# app.security_schemes = {
+#     "BearerAuth": {
+#         "type": "http",
+#         "scheme": "bearer",
+#         "bearerFormat": "JWT",
+#         "description": "Enter your Cognito JWT (Access Token or ID Token) in the format 'Bearer <token>'"
+#     }
+# }
+
+# app.add_middleware(
+#     RawContextMiddleware,  # used by fastapi-cognito to store and retrieve token info
+#     plugins=(
+#         plugins.RequestIdPlugin(),
+#         plugins.CorrelationIdPlugin()
+#     )
+# )
 
 
-app = FastAPI()
-
-app.security_schemes = {
-    "BearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "description": "Enter your Cognito JWT (Access Token or ID Token) in the format 'Bearer <token>'"
-    }
-}
-
-app.add_middleware(
-    RawContextMiddleware, # used by fastapi-cognito to store and retrieve token info
-    plugins=(
-        plugins.RequestIdPlugin(),
-        plugins.CorrelationIdPlugin()
-    )
-)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5174"],
     allow_credentials=True,
     allow_methods=["*"],
+    allow_headers=["*"]
 )
+
+
 
 app.include_router(CommonRouter, prefix="/common", tags=["Common"])
 app.include_router(AdminRouter, prefix="/admin", tags=["Admin"])
 app.include_router(IngredientRouter, prefix="/ingredient", tags=["Ingredient"])
 app.include_router(UserRouter, prefix="/user", tags=["User"])
+
+# instantiate pagination - must comme after all routers are declared
+add_pagination(app)
+
 
 @app.get("/")
 async def root():
@@ -70,4 +79,3 @@ async def protected_example(auth: CognitoToken = Depends(cognito_auth.auth_requi
     The 'Authorize' button will appear in the docs because of this dependency.
     """
     return {"message": f"You are authenticated, {auth.username}! Your email is {auth.cognito_id}"}
-

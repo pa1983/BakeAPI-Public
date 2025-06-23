@@ -1,6 +1,8 @@
 from dotenv import find_dotenv, load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.logging_config import logger
+
 env_path = find_dotenv()
 if not env_path:
     print("Warning - no env_path found ")
@@ -37,8 +39,11 @@ class Settings(BaseSettings):
 
 try:
     settings = Settings()
+    logger.debug('Settings sucessfully loaded from .env')
 except Exception as e:
-    raise Exception(f'Error loading settings from .env file - confirm .env file is present')
+    msg = f'Error loading settings from .env file - confirm .env file is present'
+    logger.warning(msg)
+    raise Exception(msg)
 
 if __name__ == '__main__':
     for s in settings:

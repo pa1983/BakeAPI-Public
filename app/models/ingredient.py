@@ -1,4 +1,4 @@
-#ingredient.py
+# ingredient.py
 # from __future__ import annotations # Postpone evaluation of type hints to prevent circular import issues
 
 from typing import Optional, List
@@ -34,9 +34,8 @@ class Ingredient(SQLModel, table=True):
     # 'images' is the new relationship attribute on Ingredient
     image_links: List["Ingredient_Image"] = Relationship(
 
-        back_populates="ingredient" # relates the name of the relationship on the Image model
+        back_populates="ingredient"  # relates the name of the relationship on the Image model
     )
-    
 
 
 class IngredientRead(SQLModel):
@@ -52,11 +51,19 @@ class IngredientRead(SQLModel):
     organisation: Optional[OrganisationRead]  # optionally passes through an organisation read instance
 
     image_links: List[Ingredient_ImageRead] = []
-    # todo - consider??  image_links works as-is.  Do I need to use the computed_field and property?  Might be useful to flatten?  or just extra complexity?
-    # todo -  the @property approad places the image in a sorted lost that can be iterated through, but the sort_order isn't explicitly displayed.  Which is best suited?
 
-    @computed_field(return_type=List[ImageRead]) # Pydantic decorator - used to define a property whose value is dynamically computed from other fields in the model (in this case, after then main data is loaded)
+    # todo - consider??  image_links works as-is.  Do I need to use the computed_field and property?  Might be useful to flatten?  or just extra complexity?
+    # todo -  the @property approach places the image in a sorted lost that can be iterated through, but the sort_order isn't explicitly displayed.  Which is best suited?
+    # make decision once get react start page running
+
+    @computed_field(return_type=List[
+        ImageRead])  # Pydantic decorator - used to define a property whose value is dynamically computed from other fields in the model (in this case, after then main data is loaded)
     @property  # makes the images function accessible as if it were a class attribute
     def images(self) -> List[ImageRead]:
         sorted_image_links = sorted(self.image_links, key=lambda link: link.sort_order)  # apply sort order
-        return [link.image for link in sorted_image_links if link.image]   # return only the image instance, in a sorted list
+        return [link.image for link in sorted_image_links if
+                link.image]  # return only the image instance, in a sorted list
+
+
+class IngredientListRead(SQLModel):
+    ingredients: List[IngredientRead]

@@ -5,6 +5,9 @@ from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 
 class ImageBase(SQLModel):  # common elements that will be used in both the table model and read model
+    """
+    Called ImageBase , but can be used for any documents being uploaded to S3
+    """
     file_name: str = Field(max_length=255, nullable=False)
     file_ext: str = Field(max_length=10, nullable=False, description='File extension')
     mime_type: str = Field(max_length=50, nullable=False)
@@ -46,7 +49,7 @@ class Image(ImageBase, table=True):  # inherit the image base
     organisation: Optional["Organisation"] = Relationship(back_populates="images")
     # define relationship to the IngredientImage linking table
     ingredient_links: List["Ingredient_Image"] = Relationship(back_populates="image")
-
+    # todo - add links to other tables, e.g. invoices, pricelists etc
 
 
 class ImageRead(ImageBase):
