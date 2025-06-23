@@ -14,7 +14,7 @@ from app.dependencies.user_dependencies import get_current_user
 
 from app.models.common import ApiResponse
 from app.models.user import User
-from app.models.ingredient import Ingredient, Ingredient_Image, IngredientRead, IngredientListRead
+from app.models.ingredient import Ingredient, Ingredient_Image, IngredientRead
 # come back to figure out ingredient read and how to handle it
 from app.models.ingredient_image import *
 from app.models.uom import *
@@ -45,7 +45,7 @@ async def get_ingredients(
                           own_organisation: Optional[bool] = Query(None, description="Show only ingredients that belong to user's organisation")
                           # todo - add more filter types, e.g. ingredient type?  ONLY those owned by organisation (not NONE)
                             # todo - add auth required - disabled for testing
-                          ):
+                          ) -> IngredientRead:
     """
     Get all ingredients available to current signed in user.
     Returns nested objects, so each ingredient instance contains any available photos and UOM details
@@ -61,8 +61,8 @@ async def get_ingredients(
 
 
     """
-    user = User(organisation_id=1, user_id=1)
-    user.organisation_id = 1;
+    # user = User(organisation_id=1, user_id=1)
+    # user.organisation_id = 1;
     # todo - break out statements into separte file -will make query testing simpler and keep this tidier
     # logger.debug(f"Getting ingredients.  Org ID {user.organisation_id}")
     statement = (

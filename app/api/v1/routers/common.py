@@ -7,7 +7,7 @@ from app.api.v1.routers import organisation
 from app.core.logging_config import logger
 from app.database.session import get_session
 from app.models.common import ApiResponse
-from app.models.uom import unit_of_measure
+from app.models.uom import UnitOfMeasure
 
 from app.core.auth import cognito_auth
 from app.dependencies.user_dependencies import get_current_user
@@ -24,9 +24,9 @@ CommonRouter: APIRouter = APIRouter()
 # see below for depndancy injection of sqlmodel session
 @CommonRouter.get("/uom",
                   status_code=status.HTTP_200_OK,  # pre-define the success status code.  Only gets overridden if there's an HTTP error thrown
-                  response_model=List[unit_of_measure])
+                  response_model=List[UnitOfMeasure])
 async def uom_get(session: Session = Depends(get_session),
-                  current_user: User = Depends(get_current_user))->List[unit_of_measure]:
+                  current_user: User = Depends(get_current_user))->List[UnitOfMeasure]:
     # todo - come back and get get_user working - going to be fundamental to all subsequent queries
     # ,
     #               current_user: User = Depends(get_user)
@@ -39,7 +39,7 @@ async def uom_get(session: Session = Depends(get_session),
     :return: 
     """
     try:
-        res =  session.exec(select(unit_of_measure)).all()
+        res =  session.exec(select(UnitOfMeasure)).all()
 
         return res
     except Exception as e:

@@ -2,7 +2,12 @@
 from datetime import datetime, timezone
 from typing import Optional, List
 
+from pydantic import ConfigDict, computed_field
 from sqlmodel import SQLModel, Field, Relationship
+
+from app.core.config import settings
+
+S3_BASE_URL = settings.S3_BASE_URL
 
 class ImageBase(SQLModel):  # common elements that will be used in both the table model and read model
     """
@@ -38,6 +43,16 @@ class ImageBase(SQLModel):  # common elements that will be used in both the tabl
         description='Used as S3, or other cloud store, document key. UUID avoids need for checking if name already exists.'
     )
 
+    # @computed_field(property_name="image_url", return_schema={"type": "string"})
+    # @property
+    # def image_url(self) -> str:
+    #     """
+    #     Dynamically constructs the full image URL using the base S3 URL and the s3_key.
+    #     """
+    #     print('attempting to generate url')
+    #     return f'{S3_BASE_URL}/{self.s3_key}'
+
+
 class Image(ImageBase, table=True):  # inherit the image base
     """
     Represents an image entry in the database.
@@ -58,6 +73,14 @@ class ImageRead(ImageBase):
         Contains all API user-friendly data, excluding the relationship objects
         """
     image_id: int
+    tst: str = "SAMPLE"  # <- this makes it into the API respponse, but the @property key and value do not appear
+    model_config = ConfigDict(from_attributes=True)
 
-
-
+    @computed_field(alias="image_url")
+    @property
+    def image_url(self) -> str:
+        """
+        Dynamically constructs the full image URL using the base S3 URL and the s3_key.
+        """
+        print('attempting to generate url')
+        return f'{S3_BASE_URL}/{self.s3_key}'

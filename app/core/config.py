@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str
     AWS_REGION: str
     S3_BUCKET_NAME: str
+    S3_BASE_URL: str
 
     # cognito user pool details
     AWS_COGNITO_USERPOOL_ID: str

@@ -20,7 +20,7 @@ from app.dependencies.user_dependencies import get_current_user
 from app.models.user import User
 from app.models.ingredient_image import Ingredient_Image
 from app.models.ingredient import Ingredient
-from app.models.uom import unit_of_measure
+from app.models.uom import UnitOfMeasure
 from app.models.organisation import Organisation
 
 app = FastAPI(title="BakeAPI")
