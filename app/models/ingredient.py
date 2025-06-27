@@ -4,6 +4,7 @@ from typing import Optional, List
 from datetime import datetime, timezone
 
 from pydantic import computed_field, ConfigDict
+from sqlalchemy import func
 from sqlmodel import SQLModel, Field, Relationship
 
 from app.models.ingredient_image import Ingredient_Image, Ingredient_ImageRead
@@ -22,7 +23,6 @@ class IngredientBase(SQLModel):
 
 class Ingredient(IngredientBase, table=True):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-
     ingredient_id: int = Field(default=None, primary_key=True)
     # ingredient_name: str = Field(max_length=50, unique=True, index=True)
     standard_uom_id: int = Field(foreign_key="unit_of_measure.uom_id")
@@ -32,8 +32,8 @@ class Ingredient(IngredientBase, table=True):
     created_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),
                                         nullable=False)
     modified_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),
-                                         sa_column_kwargs={"onupdate": "NOW()"})
-
+                                         nullable=False,
+                                         sa_column_kwargs={"onupdate": func.now()})  # need to call sqlalchmeny now here or won't update as expected
 
     # note use of string literal below to avoid circular import errors if use direct class reference
     standard_uom: "UnitOfMeasure" = Relationship(back_populates="ingredients")
@@ -41,15 +41,11 @@ class Ingredient(IngredientBase, table=True):
     # Direct many-to-many relationship to Image via IngredientImage link model
     # 'images' is the new relationship attribute on Ingredient
     image_links: List["Ingredient_Image"] = Relationship(
-
         back_populates="ingredient"  # relates the name of the relationship on the Image model
     )
 
 
-
 class IngredientRead(IngredientBase):
-    # todo - consider??  image_links works as-is.  Do I need to use the computed_field and property?  Might be useful to flatten?  or just extra complexity?
-    # todo -  the @property approach places the image in a sorted lost that can be iterated through, but the sort_order isn't explicitly displayed.  Which is best suited?
     ingredient_id: int
     created_timestamp: datetime
     modified_timestamp: datetime
@@ -63,7 +59,5 @@ class IngredientRead(IngredientBase):
         sorted_image_links = sorted(self.image_links, key=lambda link: link.sort_order)  # apply sort order
         return [ImageRead.model_validate(link.image) for link in sorted_image_links if link.image]  # return only the image instance, in a sorted list
 
-
-
-# class IngredientListRead(SQLModel):
-#     ingredients: List[IngredientRead]
+class IngredientUpdateForm(IngredientBase):
+    standard_uom: Optional[UnitOfMeasureRead]

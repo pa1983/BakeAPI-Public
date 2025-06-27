@@ -1,9 +1,9 @@
 # check if the org id is either a match to the user, or null (denoting a generic entry)
 import os
 
-from fastapi import APIRouter, status, Depends, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, status, Depends, HTTPException, UploadFile, File, Form, Query, Body
 from fastapi_pagination import Page, paginate
-from fastapi_pagination.ext.sqlmodel import paginate as sqlmodel_paginate # SQLModel-specific paginate
+from fastapi_pagination.ext.sqlmodel import paginate as sqlmodel_paginate  # SQLModel-specific paginate
 
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select, and_, or_
@@ -14,7 +14,7 @@ from app.dependencies.user_dependencies import get_current_user
 
 from app.models.common import ApiResponse
 from app.models.user import User
-from app.models.ingredient import Ingredient, Ingredient_Image, IngredientRead
+from app.models.ingredient import Ingredient, Ingredient_Image, IngredientRead, IngredientBase
 # come back to figure out ingredient read and how to handle it
 from app.models.ingredient_image import *
 from app.models.uom import *
@@ -36,16 +36,18 @@ IngredientRouter: APIRouter = APIRouter()
 def print_location():
     print("Got here")
 
+
 @IngredientRouter.get("/ingredients", response_model=Page[IngredientRead])
 async def get_ingredients(
-        tst = Depends(print_location),
+        tst=Depends(print_location),
         session: Session = Depends(get_session),
-                          user: User = Depends(get_current_user),
-                          ingredient_name: Optional[str] = Query(None, description="Filter ingredients by name (case insensative)"),
-                          own_organisation: Optional[bool] = Query(None, description="Show only ingredients that belong to user's organisation")
-                          # todo - add more filter types, e.g. ingredient type?  ONLY those owned by organisation (not NONE)
-                            # todo - add auth required - disabled for testing
-                          ) -> IngredientRead:
+        user: User = Depends(get_current_user),
+        ingredient_name: Optional[str] = Query(None, description="Filter ingredients by name (case insensative)"),
+        own_organisation: Optional[bool] = Query(None,
+                                                 description="Show only ingredients that belong to user's organisation")
+        # todo - add more filter types, e.g. ingredient type?  ONLY those owned by organisation (not NONE)
+        # todo - add auth required - disabled for testing
+) -> IngredientRead:
     """
     Get all ingredients available to current signed in user.
     Returns nested objects, so each ingredient instance contains any available photos and UOM details
@@ -76,7 +78,8 @@ async def get_ingredients(
 
     # filtering logic based on parameters
     if ingredient_name:
-        statement = statement.where(Ingredient.ingredient_name.ilike(f"%{ingredient_name}%"))  # ilike for case-insensative comparison. %{}% for 'contains' search
+        statement = statement.where(Ingredient.ingredient_name.ilike(
+            f"%{ingredient_name}%"))  # ilike for case-insensative comparison. %{}% for 'contains' search
 
     if own_organisation:
         statement = statement.where(Ingredient.organisation_id == user.organisation_id)
@@ -94,14 +97,77 @@ async def get_ingredients(
     return sqlmodel_paginate(session, statement)
 
 
-@IngredientRouter.get("/id/{ingredient_id}",
-                      status_code=status.HTTP_200_OK,
-                      response_model=ApiResponse[IngredientRead])
-async def get_ingredient(ingredient_id: int,
-                         session: Session = Depends(get_session),
-                         user: User = Depends(get_current_user)
 
-                         ) -> ApiResponse[IngredientRead]:
+@IngredientRouter.post("/",
+                        status_code=status.HTTP_201_CREATED,
+                        response_model=ApiResponse[IngredientRead | None])
+async def post_ingredient(session: Session = Depends(get_session),
+                           user: User = Depends(get_current_user),
+                           form_data: IngredientBase = Body(...)
+                           ) -> ApiResponse:
+
+    # start by getting current ingredient instance from the DB, checking that the user is from correct org before pulling
+    try:
+        ingredient = Ingredient.model_validate(form_data)
+        ingredient.organisation_id = user.organisation_id
+        session.add(ingredient)
+        session.commit()
+        session.refresh(ingredient)
+        responseIngredient: IngredientRead = IngredientRead.model_validate(ingredient)
+
+        return ApiResponse(message="Ingredient updated successfully", data=responseIngredient)
+
+    except Exception as e:
+        # the ingredient doesn't exist, or doesn't belong to the user's org so can't be udpdated
+        return ApiResponse(message="Ingredient not found", status_code=status.HTTP_403_FORBIDDEN, data=None)
+
+
+@IngredientRouter.patch("/id/{ingredient_id}",
+                       status_code=status.HTTP_202_ACCEPTED,
+                       response_model=ApiResponse[IngredientRead | None])
+async def patch_ingredient(ingredient_id: int,
+                           session: Session = Depends(get_session),
+                           user: User = Depends(get_current_user),
+                           form_data: IngredientBase = Body(...)
+                           ) -> ApiResponse:
+
+    # start by getting current ingredient instance from the DB, checking that the user is from correct org before pulling
+
+    ingredient: Ingredient = session.exec(
+        (
+            select(Ingredient)
+            .where(
+                and_(Ingredient.ingredient_id == ingredient_id,
+                     Ingredient.organisation_id == user.organisation_id
+                     )
+            )
+
+        )
+    ).first()
+    if ingredient:
+        update_data = form_data.model_dump(exclude_unset=True)  # only update for present values - avoid overwriting for missing fields
+        for key, value in update_data.items():
+            setattr(ingredient, key, value)
+        session.add(ingredient)
+        session.commit()
+        session.refresh(ingredient)
+        responseIngredient: IngredientRead = IngredientRead.model_validate(ingredient)
+
+        return ApiResponse(message="Ingredient updated successfully", status_code=status.HTTP_202_ACCEPTED, data=responseIngredient)
+
+    else:
+        # the ingredient doesn't exist, or doesn't belong to the user's org so can't be udpdated
+        return ApiResponse(message="Ingredient not found", status_code=status.HTTP_403_FORBIDDEN, data=None)
+
+
+@IngredientRouter.get("/id/{ingredient_id}",
+                       status_code=status.HTTP_200_OK,
+                       response_model=ApiResponse[IngredientRead])
+async def get_ingredient(ingredient_id: int,
+                   session: Session = Depends(get_session),
+                   user: User = Depends(get_current_user)
+
+                   ) -> ApiResponse[IngredientRead]:
     """
     Get a single ingredient by ID
     :param ingredient_id:
@@ -110,13 +176,12 @@ async def get_ingredient(ingredient_id: int,
     :return:
     """
     print(f'getting ingredient data for ID: {ingredient_id}')
-    organisation_id = 1  # todo - arhdcoded in for testing.  Make dynaic from current signed in user for prod
     # look up the ingredient ID, and confirm that it belongs to the org id OR is a generic for use by all users
     statement = (
         select(Ingredient)
         .where(
             and_(Ingredient.ingredient_id == ingredient_id,
-                 or_(Ingredient.organisation_id == organisation_id,
+                 or_(Ingredient.organisation_id == user.organisation_id,
                      Ingredient.organisation_id.is_(None)))
         )
         .options(
@@ -130,7 +195,6 @@ async def get_ingredient(ingredient_id: int,
            .first())
 
     # Pydantic's model_validate automatically handles the nested list of ImageRead due to the direct relationship
-
     ingredient_read_instance = IngredientRead.model_validate(res)
 
     return ApiResponse(data=ingredient_read_instance, message=f'Ingredient Found')

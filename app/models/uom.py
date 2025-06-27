@@ -7,7 +7,7 @@ class UnitOfMeasureBase(SQLModel):
 
     # name: str = Field(index=True, unique=True, max_length=50)
     # abbreviation: str = Field(index=True, unique=True, max_length=10)
-    # type: str = Field(max_length=20)
+    type: str = Field(max_length=20)
     # conversion_factor: float = Field(ge=0)  # Using float for DECIMAL, adjust precision as needed
     # is_base_unit: bool
     name: str
@@ -30,5 +30,6 @@ class UnitOfMeasure(UnitOfMeasureBase, table=True):
 
 class UnitOfMeasureRead(UnitOfMeasureBase):
     # inherits all parent fields
+    uom_id: Optional[int]
     model_config = ConfigDict(from_attributes=True)
     pass

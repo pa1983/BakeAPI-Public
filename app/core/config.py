@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     AWS_COGNITO_TEST_USERNAME: str
     AWS_COGNITO_TEST_PASSWORD: str
 
+    GEMINI_API_KEY: str
+
     model_config = SettingsConfigDict(env_file=env_path, extra='ignore')
 
 try:
