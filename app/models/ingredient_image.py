@@ -30,7 +30,10 @@ class Ingredient_Image(Ingredient_ImageBase, table=True):
     )
 
     ingredient: "Ingredient" = Relationship(back_populates="image_links")
-    image: "Image" = Relationship(back_populates="ingredient_links")
+    # image: "Image" = Relationship(back_populates="ingredient_links")
+    # removed the backpopulates to make the relationship uni-directional and remove need for image to have an ingredient reference - was preventing use of image table in invoices
+    image: "Image" = Relationship()
+
 
 class Ingredient_ImageRead(Ingredient_ImageBase):
     sort_order:Optional[int]

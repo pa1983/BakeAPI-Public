@@ -62,8 +62,8 @@ class Image(ImageBase, table=True):  # inherit the image base
 
     # define relationships to the TABLE as these can't be defined within the Base class
     organisation: Optional["Organisation"] = Relationship(back_populates="images")
-    # define relationship to the IngredientImage linking table
-    ingredient_links: List["Ingredient_Image"] = Relationship(back_populates="image")
+    # REMOVED THIS to make a one-way relationship from ingredient to allow use of Image table by invoice etc define relationship to the IngredientImage linking table
+    # ingredient_links: List["Ingredient_Image"] = Relationship(back_populates="image")
     # todo - add links to other tables, e.g. invoices, pricelists etc
 
 

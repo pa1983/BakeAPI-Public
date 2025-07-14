@@ -1,12 +1,13 @@
 import json
 
-from app.models.invoice import ParsedInvoice, InvoiceDetails, LineItem
+from app.models.invoice import ParsedInvoice, ParsedInvoiceDetails, ParsedLineItem
 
-# Get standard schema (with $defs and $refs)
+# Get standard schema (which will include $defs and $refs)
 schema = ParsedInvoice.model_json_schema()
 
 # Inline $refs
 def inline_refs(schema: dict) -> dict:
+    # gemini doesn't play nicely with inline refs - need to be removed and replaced with explicit/duplicate refs
     defs = schema.pop("$defs", {})
 
     def resolve_ref(obj):
@@ -28,6 +29,9 @@ def inline_refs(schema: dict) -> dict:
 
 
 def clean_and_gemini_normalize(obj):
+    # gemini allows only one datatype per field - need to replace anyOf with a specific type.
+    # Where database schemas or pydantaic models allow a datatype | null, gemini assumes the null, so remove it and leave
+    # only the explicit datatype
     if isinstance(obj, dict):
         obj.pop("title", None)
         obj.pop("default", None)
@@ -52,11 +56,6 @@ def clean_and_gemini_normalize(obj):
         for item in obj:
             clean_and_gemini_normalize(item)
 
-
-
 schema = inline_refs(schema)
-# do I want to return the raw schema, or the json encoded one?
 clean_and_gemini_normalize(schema)
 GEMINI_SCHEMA = schema
-# GEMINI_SCHEMA = json.dumps(schema, indent=2)
-# print(GEMINI_SCHEMA)
