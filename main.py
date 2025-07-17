@@ -9,6 +9,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette_context import plugins
 from starlette_context.middleware import RawContextMiddleware
 
+from app.api.v1.routers.invoice import InvoiceRouter
 from app.core.logging_config import logger
 from app.api.v1.routers.admin import AdminRouter
 from app.api.v1.routers.common import CommonRouter
@@ -57,6 +58,7 @@ app.include_router(CommonRouter, prefix="/common", tags=["Common"])
 app.include_router(AdminRouter, prefix="/admin", tags=["Admin"])
 app.include_router(IngredientRouter, prefix="/ingredient", tags=["Ingredient"])
 app.include_router(UserRouter, prefix="/user", tags=["User"])
+app.include_router(InvoiceRouter, prefix="/invoice", tags=["Invoice"])
 
 # instantiate pagination - must comme after all routers are declared
 add_pagination(app)

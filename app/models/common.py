@@ -14,7 +14,7 @@ class ApiResponse(BaseModel, Generic[T]):
     The actual type will be specified when an ApiResponse object is created
 
     Usage:
-    @app.get("/enpoint", response_mode=ApiResponse[ResponseClass]
+    @app.get("/endpoint", response_mode=ApiResponse[ResponseClass]
     return {"data":responseClass, "message":"retrival successful"}  # status defaults to 200
 
     # todo - for international translations, consider how this message can be translated as required

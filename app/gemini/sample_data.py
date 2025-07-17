@@ -1,3 +1,4 @@
+# for use when testing functionality without need to make API calls to gemini
 
 response = """{
   "line_items": [

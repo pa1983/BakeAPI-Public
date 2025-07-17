@@ -1,16 +1,31 @@
 import json
 from datetime import datetime, timezone
 from typing import List, Optional
+
+from pydantic import BaseModel
 from sqlmodel import SQLModel, Relationship, Field
 
 from app.database.session import engine
 from app.models.image import Image
 from app.models.organisation import Organisation
+# these otherwise unused imports are required to fulfill forward reference requirements of referenced models - without these mapper initialisation will fail
+from app.models.role import Role
+from app.models.ingredient import Ingredient
+from app.models.user import User
+from app.models.uom import UnitOfMeasure
 
+class InvoiceStatus(SQLModel, table=True):
+    """
+    List of invoice stati to describe current invoice status
+    """
+    name: str = Field(primary_key=True)
+    display_name: str = Field(nullable=False)
+    description: str = Field()
+    sort_order: int = Field(default=0)
 
 class ParsedLineItem(SQLModel):
     """
-    Definition of invoice line item fields to be extracted by Gemini
+    Definition of invoice line item fields to be extracted by Gemini - fed into gemini to form the output schema
     """
 
     cases: Optional[int] = Field(None, description="Number of cases for the line item - synonyms: cartons, boxes.")
@@ -36,21 +51,21 @@ class ParsedInvoiceDetails(SQLModel):
                                        description="Supplier_ID of the supplier if the parsing engine can find a patch to list of existing suppliers.")
     customer_account_number: Optional[str] = Field(None, alias="customer account number",
                                                    description="Customer's account number.")
-    invoice_number: str = Field(..., alias="invoice number", description="Invoice number. synonyms: invoice ID")
+    invoice_number: Optional[str] = Field(..., alias="invoice number", description="Invoice number. synonyms: invoice ID")
     user_reference: Optional[str] = Field(None, alias="user reference", description="User's reference on the invoice.")
     supplier_reference: Optional[str] = Field(None, alias="supplier reference",
                                               description="Supplier's reference on the invoice.")
-    calculated_total: float = Field(...,
+    calculated_total: float|None = Field(...,
                                     description="Sum of the total of all line items, taking into account the VAT rate for each line. This should be calculated from the extracted line items.")
-    invoice_total: float = Field(..., alias="invoice_total",
+    invoice_total: float|None = Field(..., alias="invoice_total",
                                  description="The total invoice amount including VAT, as displayed on the invoice.")
-    delivery_cost: float = Field(..., alias="delivery_cost",
+    delivery_cost: float|None = Field(..., alias="delivery_cost",
                                  description="This may appear as a line item on the invoice with a carrier name such as DPD, royal mail, fed ex, ups or other delivery providers.Total delivery cost. Default to 0.0 if not found on invoice")
     currency: str = Field(..., alias="currency", description="Currency in 3-character ISO 4217 code.")
     document_type: str = Field("invoice",
                                description="Type of duocument, e.g. invoice, packing_list, order_confirmation,receipt")
     invoice_date: datetime = Field(description="Date on which the invoice was created.")
-    confidence_score: float = Field(..., alias="confidence_score",
+    confidence_score: float = Field(default=0, alias="confidence_score",
                                     description="Confidence score from Gemini of confidence in accuracy of parsing of the invoice.")
 
 
@@ -77,11 +92,14 @@ class Invoice(ParsedInvoiceDetails, SQLModel, table=True):
         default_factory=lambda: datetime.now(timezone.utc),
         sa_column_kwargs={"onupdate": lambda: datetime.now(timezone.utc)}
     )
-    parse_duration_ms: int = Field(..., alias="parse_duration_ms",
+    parse_duration_ms: int = Field(default=0, alias="parse_duration_ms",
                                    description="Parser runtime duration in milliseconds.")
-    parse_ai_tokens: int = Field(..., alias="parse_ai_tokens",
+    parse_ai_tokens: int = Field(default=0, alias="parse_ai_tokens",
                                  description="Number of gemini tokens consumed by the parsing of this invoice - may be useful for customer billing/identification of system abuse.")
-
+    status: str = Field(default='processing', foreign_key="invoicestatus.name")
+    invoice_status: InvoiceStatus = Relationship()
+    received_date: Optional[datetime] = Field(default=None, description="Date on which the physical order was received.")
+    notes: Optional[str] = Field(description="Additional notes about the invoice or discrepancies within it")
     image_id: Optional[int] = Field(
         default=None,
         foreign_key="image.image_id",
@@ -93,7 +111,7 @@ class Invoice(ParsedInvoiceDetails, SQLModel, table=True):
     # two-way relationship to line item as there may be need to access invoice from line item and vice-versa
     line_items: List['LineItem'] = Relationship(back_populates='invoice')
 
-
+class DBInvoice(Invoice, SQLModel, table=True):
 
 
 class LineItem(ParsedLineItem, SQLModel, table=True):
@@ -103,6 +121,20 @@ class LineItem(ParsedLineItem, SQLModel, table=True):
     id: Optional[int] = Field(primary_key=True, description="Line item ID")
     invoice_id: Optional[int] = Field(default=None, description='Reference to parent invoice ID', foreign_key="invoice.id")
     invoice: Optional[Invoice] = Relationship(back_populates="line_items")
+
+
+class InvoiceListResponse(BaseModel):
+    """
+    Used for calls to invoice/invoices endpoint to display list of invoices
+    """
+
+    id: int
+    date_added: datetime
+    date_modified: datetime
+    supplier_name: str|None
+    invoice_number: str|None
+    status: InvoiceStatus
+    image: Image
 
 if __name__ == '__main__':
     engine = engine

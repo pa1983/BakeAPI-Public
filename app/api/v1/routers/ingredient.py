@@ -254,7 +254,7 @@ async def image_upload_post(file: UploadFile = File(...),
     except Exception as e:
         session.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            details=f"Error uploading file - please try again: {e}")
+                            detail=f"Error uploading file - please try again: {e}")
 
 
 @IngredientRouter.get("/image/delete")

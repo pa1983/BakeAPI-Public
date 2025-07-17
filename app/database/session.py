@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from typing import Generator
 
 from sqlmodel import create_engine, Session
@@ -12,9 +13,10 @@ DATABASE_URL = f"mysql+pymysql://{settings.USER}:{settings.PASSWORD}@{settings.H
 engine = create_engine(DATABASE_URL)
 
 
+
 def get_session() -> Generator[Session, None, None]:
     """
-    Session helper function - keeps session code as concise as possible in all DB calls
+    Session helper function for use within FastAPI DB calls via dependancies- keeps session code as concise as possible in all DB calls
     Yields a database session from the engine's connection pool.
     Ensures the session is closed after use.
 
@@ -30,6 +32,13 @@ def get_session() -> Generator[Session, None, None]:
     with Session(engine) as session:
         yield session
 
+@contextmanager
+def db_session() -> Generator[Session, None, None]:
+    """
+    A context manager for providing a database session for non-FastAPI use.
+    """
+    with Session(engine) as session:
+        yield session
 
 if __name__ == "__main__":
     print(engine)
