@@ -7,11 +7,13 @@ from google.genai.types import Tool, FunctionDeclaration, Part, GenerationConfig
 from sqlmodel import select
 
 from app.core.logging_config import logger
+from app.database.session import db_session
 from app.gemini import sample_data
 from app.gemini.schema import GEMINI_SCHEMA
 from app.core.config import settings
-from app.models.invoice import ParsedInvoice, Invoice, LineItem
-from app.database.session import db_session
+from app.models.invoice import ParsedInvoice, Invoice, LineItem, InvoiceUpdatePayload, Currency
+from app.models.supplier import Supplier
+
 from app.services.s3_handler import delete_s3_object
 
 client = genai.Client(api_key=settings.GEMINI_API_KEY)
@@ -23,7 +25,8 @@ parse this invoice, using the descriptions of fields in the schema for guidance.
 If you can't find exact matches look for something similar. 
 Attempt to convert any vat codes to actual vat percentages and present as a floating point number
 - code tables should be available in the document.
-Provide a confidence score based on your confidence in the accuracy of the parsed data (floating point number from 0 to 1)
+Dates MUST be converted to ISO date time format, or left null.
+Provide a confidence score based on your confidence in the accuracy of the parsed data (floating point number from 0 to 1).
 """
 
 GENERATION_CONFIG: dict = {
@@ -150,7 +153,7 @@ def apply_db_schema_to_response_data(parsed_invoice: ParsedInvoice, invoice_id:i
 #         raise e
 
 
-def push_invoice_to_db(invoice_to_save: Invoice) -> Invoice:
+def push_invoice_to_db(payload: InvoiceUpdatePayload, invoice_id: int) -> Invoice:
     """
     Updates an existing invoice in the database with parsed data.
     This function replaces all existing line items with the new ones.
@@ -158,14 +161,21 @@ def push_invoice_to_db(invoice_to_save: Invoice) -> Invoice:
     try:
         with db_session() as session:
             # Get the existing invoice instance by ID
-            existing_invoice = session.get(Invoice, invoice_to_save.id)
+            existing_invoice = session.get(Invoice, invoice_id)
             if not existing_invoice:
-                raise ValueError(f"Invoice with ID {invoice_to_save.id} not found.")
+                raise ValueError(f"Invoice with ID {invoice_id} not found.")
 
             # 1. Update the scalar fields on the Invoice object
             # This is a cleaner way to get only the fields that were set in the source object.
-            update_data = invoice_to_save.model_dump(exclude_unset=True, exclude={'id', 'line_items'})
+            # update_data = invoice_to_save.model_dump(exclude_unset=True, exclude={'id', 'line_items'})
+            update_data = payload.invoice_details.model_dump(exclude_unset=True, exclude={'id'})
+            update_data['parse_duration_ms'] = payload.parse_duration_ms
+            update_data['parse_ai_tokens'] = payload.parse_ai_tokens
+            update_data['supplier_id'] = payload.supplier_id
+            update_data['currency_code'] = payload.currency_code
+
             for key, value in update_data.items():
+
                 if value is not None:
                     setattr(existing_invoice, key, value)
 
@@ -181,18 +191,19 @@ def push_invoice_to_db(invoice_to_save: Invoice) -> Invoice:
 
             # Now, assign the new line items. SQLAlchemy will see these as new
             # objects to be added to the database and linked to the invoice.
-            existing_invoice.line_items = invoice_to_save.line_items
+            new_line_items = [LineItem(**item.model_dump()) for item in payload.line_items]
+            existing_invoice.line_items = new_line_items
 
             # 3. Update status and commit all changes
             existing_invoice.status = 'draft'
-            session.add(existing_invoice)
+            # session.add(existing_invoice)
             session.commit()
             session.refresh(existing_invoice)
             return existing_invoice
 
     except Exception as e:
         # Log the incoming object as the local variable might not be set if an error occurs early
-        logger.exception(f"Could not push invoice to database. Error: {e} -- Data: {invoice_to_save.model_dump_json()}")
+        logger.exception(f"Could not push invoice to database. Error: {e} -- Data: {payload.model_dump_json()}")
         raise e
 
 
@@ -206,15 +217,55 @@ def set_invoice_status_failed(invoice_id):
         logger.debug(f'error deleting invoice {invoice_id}: {e}')
 
 
+def infer_currency_code(currency: str) -> str | None:
+    """
+    Takes the currency string found on the invoice and attempts to match it to a currency_code in the currency table
+    :param currency: currency string from database
+    :return: currency_code from currency db table
+    """
+    if not currency:
+        return None
+    with db_session() as session:
+        currency_code = session.exec(
+            select(Currency.currency_code).where(Currency.currency_code == currency.strip().upper())
+        ).first()
+        return currency_code
+
+
+def infer_supplier_id(supplier: str)-> int|None:
+    # todo - improve this logic to allow for a fuzzy match
+    if not supplier:
+        return None
+    with db_session() as session:
+        supplier_id = session.exec(
+            select(Supplier.supplier_id)
+            .where(supplier.strip() == Supplier.supplier_name)
+        ).first()
+
+        return supplier_id
+
+
 def parse_invoice(pdf_file_data_bytes: bytes, invoice_id, organisation_id) -> Invoice|None:
     try:
         parse_start_time = time.perf_counter()
         logger.info("invoice parser initiated")
         gemini_response = send_invoice_to_gemini(pdf_file_data_bytes)
         runtime_ms = (time.perf_counter() - parse_start_time) * 1000
-        parsed_invoice = extract_gemini_response(gemini_response)  #todo - get tokens used
-        invoice_to_save = apply_db_schema_to_response_data(parsed_invoice=parsed_invoice,invoice_id=invoice_id, organisation_id=organisation_id, runtime_ms=runtime_ms, tokens_used=gemini_response.usage_metadata.total_token_count)
-        saved_invoice = push_invoice_to_db(invoice_to_save=invoice_to_save)  # todo - set invoice stats to parsed or failed.  add notes?
+        parsed_invoice: ParsedInvoice = extract_gemini_response(gemini_response)
+        # infer linked table fields - currency_code, supplier_id, line item buyable id
+        currency_code = infer_currency_code(parsed_invoice.invoice_details.parsed_currency)
+        supplier_id = infer_supplier_id(parsed_invoice.invoice_details.supplier_name)
+
+        update_payload = InvoiceUpdatePayload(
+            invoice_details = parsed_invoice.invoice_details,
+            line_items=parsed_invoice.line_items,
+            parse_duration_ms = int(runtime_ms),
+            parse_ai_tokens= gemini_response.usage_metadata.total_token_count,
+            currency_code = currency_code,
+            supplier_id = supplier_id
+        )
+
+        saved_invoice = push_invoice_to_db(payload=update_payload, invoice_id=invoice_id)
         return saved_invoice
     except Exception as e:
         logger.exception(f"Could not parse invoice. Error: {e}--{invoice_id}")

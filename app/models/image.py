@@ -73,7 +73,6 @@ class ImageRead(ImageBase):
         Contains all API user-friendly data, excluding the relationship objects
         """
     image_id: int
-    tst: str = "SAMPLE"  # <- this makes it into the API respponse, but the @property key and value do not appear
     model_config = ConfigDict(from_attributes=True)
 
     @computed_field(alias="image_url")
@@ -84,3 +83,11 @@ class ImageRead(ImageBase):
         """
         print('attempting to generate url')
         return f'{S3_BASE_URL}/{self.s3_key}'
+
+class ImageInvoiceRead(ImageBase):
+    """
+    Pydantic model for exposing Image data in API responses.
+        Contains all API user-friendly data, excluding the relationship objects
+        """
+    image_id: int
+    model_config = ConfigDict(from_attributes=True)

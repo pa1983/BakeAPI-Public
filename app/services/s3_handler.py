@@ -32,11 +32,29 @@ S3_SESSION, S3_BUCKET, S3_CLIENT = s3_client()
 
 def push_UploadFile_to_s3(file: UploadFile, directory: str | None = None):
     file_obj = file.file
+    file_obj.seek(0)  # make sure file cursor is at start before proceeding
     uuid = u.uuid4().hex
     if directory:
         s3_key = f"{directory}/{uuid}"
     upload_fileobj_to_s3(file_obj, s3_key)
     return s3_key
+
+def push_file_bytes_to_s3(file_bytes: bytes, directory: str | None = None):
+    uuid = u.uuid4().hex
+    if directory:
+        s3_key = f"{directory}/{uuid}"
+    else:
+        s3_key = uuid
+
+    res = S3_CLIENT.put_object(
+        Bucket=settings.S3_BUCKET_NAME,
+        Key=s3_key,
+        Body=file_bytes
+    )
+
+    print(res)
+    return s3_key
+
 
 
 def upload_fileobj_to_s3(file_object, s3_key):
@@ -47,6 +65,8 @@ def upload_fileobj_to_s3(file_object, s3_key):
     :return: None
     """
     try:
+        # todo - add checks here that file object is correct format - send error if not
+
         S3_BUCKET.upload_fileobj(file_object, s3_key)
 
     except Exception as e:

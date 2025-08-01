@@ -19,6 +19,6 @@ class ApiResponse(BaseModel, Generic[T]):
 
     # todo - for international translations, consider how this message can be translated as required
     """
-    data: T|None  # generic data type to store any resonse data type.  Allow none for successful POST of data, etc
+    data: T|None = None  # generic data type to store any resonse data type.  Allow none for successful POST of data, etc
     message: str = "Operation Successful"  # Default message; can be overridden before sending response
     status_code: int = 200  # Default status; can be overridden before sending

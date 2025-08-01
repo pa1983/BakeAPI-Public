@@ -96,10 +96,10 @@ async def get_current_user(
     # todo - later, implement RBAC using:
     # if current_user.role and any(p.name == "add_ingredient" for p in current_user.role.permissions):
 
-    if request.method == "OPTIONS":
-         # // added to try and resolve cors-related error that was allowing options requests to find their way to this dependancy and fail when no auth was present
-        logger.info("An OPTIONS request found its way to the get_current_user dependancy");
-        return User(cognito_sub_id="asd123", username="Dummy", email="Dummy@dummy.com")
+    # if request.method == "OPTIONS":
+    #      # // added to try and resolve cors-related error that was allowing options requests to find their way to this dependancy and fail when no auth was present
+    #     logger.info("An OPTIONS request found its way to the get_current_user dependancy");
+    #     return User(cognito_sub_id="asd123", username="Dummy", email="Dummy@dummy.com")
 
     try:
         # todo - come back and tidy this up once get system running.  Not currnetly handling the cognito id from cookies
