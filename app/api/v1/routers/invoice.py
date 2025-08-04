@@ -162,6 +162,7 @@ async def get_invoices(session: Session = Depends(get_session),
 class invoice_form_data(BaseModel):
     currencies: List[Currency]
     suppliers: List[Supplier]
+    brands: List[Brand]
 
 
 @InvoiceRouter.get("/formdata")

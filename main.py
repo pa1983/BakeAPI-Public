@@ -10,7 +10,7 @@ from starlette_context import plugins
 from starlette_context.middleware import RawContextMiddleware
 
 from app.api.v1.routers.invoice import InvoiceRouter
-from app.api.v1.routers.purchasable import PurchasableRouter
+from app.api.v1.routers.buyable import buyableRouter
 from app.core.logging_config import logger
 from app.api.v1.routers.admin import AdminRouter
 from app.api.v1.routers.common import CommonRouter
@@ -60,7 +60,7 @@ app.include_router(AdminRouter, prefix="/admin", tags=["Admin"])
 app.include_router(IngredientRouter, prefix="/ingredient", tags=["Ingredient"])
 app.include_router(UserRouter, prefix="/user", tags=["User"])
 app.include_router(InvoiceRouter, prefix="/invoice", tags=["Invoice"])
-app.include_router(PurchasableRouter, prefix="/purchasable", tags=["Purchasable"])
+app.include_router(buyableRouter, prefix="/buyable", tags=["Buyable"])
 
 
 # instantiate pagination - must comme after all routers are declared
@@ -81,6 +81,6 @@ async def say_hello(name: str):
 async def protected_example(auth: CognitoToken = Depends(cognito_auth.auth_required)):
     """
     An example of a protected route requiring a Cognito token.
-    The 'Authorize' button will appear in the docs because of this dependency.
+    The 'Authorise' button should appear in the docs because of this dependency.
     """
     return {"message": f"You are authenticated, {auth.username}! Your email is {auth.cognito_id}"}
