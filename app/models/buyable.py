@@ -2,6 +2,7 @@ import typing
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from pydantic import BaseModel
 from sqlmodel import Field, SQLModel, Relationship
 from sqlalchemy import func, UniqueConstraint
 
@@ -17,6 +18,8 @@ class BuyableBase(SQLModel):
     sku: str = Field(max_length=255)
     item_name: str = Field(max_length=255)
     uom_id: int = Field(foreign_key="unit_of_measure.uom_id")
+    # items such as meat and fruit may be sold per kg in variable size units. Item will be stored with the sales unit of measure
+    # invoice will state the actual quantity, e.g. 7.56kg and display the line item price as it would with an item sold in full units, e.g. bag sugar
     quantity: Decimal = Field(max_digits=18, decimal_places=10)
     is_active: bool = Field(default=True)
     notes: typing.Optional[str] = Field(default=None, max_length=1000)
@@ -24,7 +27,7 @@ class BuyableBase(SQLModel):
 
 class Buyable(BuyableBase, table=True):
     id: typing.Optional[int] = Field(default=None, primary_key=True)
-    organisation_id: int = Field(foreign_key="organisation.id")
+    organisation_id: int = Field(foreign_key="organisation.organisation_id")
 
     created_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc),
                                         nullable=False)
@@ -39,9 +42,12 @@ class Buyable(BuyableBase, table=True):
 
     # Unique Constraint - same SKU cannot be duplicated within one organisation
     __table_args__ = (
-        UniqueConstraint("sku", "organisation_id", name="buyable_sky_org_pk")
+        UniqueConstraint("sku", "organisation_id", name="buyable_sky_org_pk"),
     )
 
+class BuyableCreate(BuyableBase):
+    # just passes through buyable base, but keeps options option alter fields later should need arise, without changing base structure
+    pass
 
 # Read model: Defines the shape of the data when it's returned from the API.
 # It includes the auto-generated fields that should be visible to the client.
@@ -49,3 +55,19 @@ class BuyableRead(BuyableBase):
     id: int
     created_timestamp: datetime
     modified_timestamp: datetime
+
+
+class BuyableUpdate(BaseModel):
+    """
+    Restrictive list of fields that can be updated by a user.
+    Attempts by user to amend additional fields will see the data stripped away and destroped before appending to the
+    existing listing
+    Note that all must default to none to avoid pydantic typing issues when applying validate_model in the Body(...) extraction
+    """
+    brand_id: typing.Optional[int] = None
+    sku: typing.Optional[str] = None
+    item_name: typing.Optional[str] = None
+    uom_id: typing.Optional[int] = None
+    quantity: typing.Optional[Decimal] = None
+    is_active: typing.Optional[bool] = None
+    notes: typing.Optional[str] = None

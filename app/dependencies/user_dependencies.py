@@ -137,4 +137,5 @@ async def get_current_user(
 
         return usr
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"{e.args}")
+        print(e)
+        raise HTTPException(status_code=401, detail=f"{e} - {e.args}")

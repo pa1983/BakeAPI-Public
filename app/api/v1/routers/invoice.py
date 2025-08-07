@@ -1,6 +1,9 @@
+import decimal
 import os
 from http import HTTPStatus
 
+from sqlalchemy.exc import IntegrityError as sqlalchemyIntegrityError
+from pymysql.err import IntegrityError as pymlsqlIntegrityError
 from fastapi import APIRouter, status, Depends, HTTPException, UploadFile, File, Form, Query, Body
 from fastapi_pagination import Page, paginate
 from fastapi_pagination.ext.sqlmodel import paginate as sqlmodel_paginate  # SQLModel-specific paginate
@@ -13,6 +16,7 @@ from app.database.session import get_session
 from app.dependencies.user_dependencies import get_current_user
 from app.gemini.gemini import parse_invoice
 from app.models.brand import Brand
+from app.models.buyable import Buyable
 
 from app.models.common import ApiResponse
 from app.models.currency import Currency
@@ -163,6 +167,7 @@ class invoice_form_data(BaseModel):
     currencies: List[Currency]
     suppliers: List[Supplier]
     brands: List[Brand]
+    buyables: List[Buyable]
 
 
 @InvoiceRouter.get("/formdata")
@@ -178,7 +183,11 @@ async def get_invoice_form_data(session: Session = Depends(get_session),
     brands = session.exec(
         select(Brand).where(Brand.organisation_id == user.organisation_id)
     ).all()
-    res = invoice_form_data(currencies=currencies, suppliers=suppliers, brands=brands)
+    buyables = session.exec(
+        select(Buyable).where(Buyable.organisation_id == user.organisation_id)
+    ).all()
+
+    res = invoice_form_data(currencies=currencies, suppliers=suppliers, brands=brands, buyables=buyables)
     return ApiResponse(data=res, message="Invoice Form Data pulled")
 
 
@@ -237,11 +246,6 @@ async def delete_invoice(id: int, session: Session = Depends(get_session),
     return ApiResponse(status_code=HTTPStatus.NO_CONTENT, message=f"Invoice {id} deleted successfully", data=None)
 
 
-# class updateDataModel(BaseModel):
-#     field_name: str
-#     new_value: str | int | float | datetime | None | bool
-
-
 @InvoiceRouter.patch("/lineitem/{id}")
 async def update_invoice_line_item_field(data: updateDataModel,
                                          id: int, session: Session = Depends(get_session),
@@ -252,18 +256,67 @@ async def update_invoice_line_item_field(data: updateDataModel,
     session.commit()
 
 
+class InvoiceUpdate(BaseModel):
+    """
+    Schema for updating an existing invoice.
+    It includes only the fields a user is expected to modify manually.
+    System-managed fields like 'id', 'date_added', 'date_modified', and 'organisation_id' are excluded.
+    Relationships are handled via their foreign key IDs (e.g., supplier_id, status, currency_code).
+    """
+    # Fields from ParsedInvoiceDetails that a user can edit
+    customer_account_number: Optional[str] = None
+    invoice_number: Optional[str] = None
+    user_reference: Optional[str] = None
+    supplier_reference: Optional[str] = None
+    invoice_total: Optional[decimal.Decimal] = None
+    delivery_cost: Optional[decimal.Decimal] = None
+    document_type: Optional[str] = None
+    invoice_date: Optional[datetime] = None
+
+    # Editable fields from the main Invoice model
+    supplier_id: Optional[int] = None
+    currency_code: Optional[str] = None
+    status: Optional[str] = None
+    received_date: Optional[datetime] = None
+    notes: Optional[str] = None
+
+
+
+
+# todo - look at integrating the crud_factory here, along with the additional functions required for the more complex invoice.
+# todo - currently have no option to create an invoice from scratch - perhaps this would be a useful feature when a pdf is unavailable?
 @InvoiceRouter.patch("/{id}")
 async def update_invoice_field(
-        data: updateDataModel,
-        id: int, session: Session = Depends(get_session),
+        id: int,
+        update_data: InvoiceUpdate = Body(...),
+        session: Session = Depends(get_session),
         user: User = Depends(get_current_user),
 ):
-    print(data)
-    invoice = session.exec(
+    print(update_data)
+    element_to_update = session.exec(
         select(Invoice).where(and_(Invoice.id == id, Invoice.organisation_id == user.organisation_id))).first()
-    setattr(invoice, data.field_name, data.new_value)
-    session.commit()
+    element_type = "Invoice"
+    if not element_to_update:
+        return ApiResponse(status_code=status.HTTP_404_NOT_FOUND,
+                           message=f"Invoice with id {id} not found.", data=None)
 
-    print(data)
+    update_dict = update_data.model_dump(exclude_unset=True)
+    if not update_dict:
+        return ApiResponse(status_code=status.HTTP_400_BAD_REQUEST, message="No update data provided.", data=None)
+
+    for key, value in update_dict.items():
+        setattr(element_to_update, key, value)
+
+    try:
+        session.add(element_to_update)
+        session.commit()
+        session.refresh(element_to_update)
+    except (sqlalchemyIntegrityError, pymlsqlIntegrityError):
+        session.rollback()
+        return ApiResponse(status_code=status.HTTP_409_CONFLICT,
+                           message=f"Update failed. A {element_type} with that name may already exist.", data=None)
+
+    print(update_data)
     return ApiResponse(status_code=HTTPStatus.NO_CONTENT,
-                       message=f"invoice id {id}, field {data.field_name} updated to {data.new_value}")
+                       message=f"invoice id {id}, updated",
+                       data=None)

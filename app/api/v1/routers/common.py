@@ -7,6 +7,8 @@ from app.api.v1.routers import organisation
 from app.core.logging_config import logger
 from app.database.session import get_session
 from app.models.common import ApiResponse
+from app.models.currency import Currency
+from app.models.supplier import Supplier
 from app.models.uom import UnitOfMeasure
 
 from app.core.auth import cognito_auth
@@ -59,6 +61,33 @@ async def title_get(session: Session = Depends(get_session)):
                             detail="Title table not found")
 
     return res
+
+
+@CommonRouter.get("/currency",
+                  status_code=status.HTTP_200_OK,
+                  response_model=List[Currency])
+
+async def title_get(session: Session = Depends(get_session)) -> List[Currency]:
+    try:
+        res = session.exec(select(Currency).order_by(Currency.currency_name)).all()
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Currency table not found")
+
+    return res
+
+@CommonRouter.get("/supplier")
+async def get_invoice_form_data(session: Session = Depends(get_session),
+                                user: User = Depends(get_current_user))->List[Supplier]:
+    try:
+        suppliers = session.exec(
+            select(Supplier).where(Supplier.organisation_id == user.organisation_id)
+        ).all()
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Supplier table not found")
+    return suppliers
+
 
 @CommonRouter.get("/token")
 async def token_get(cognito_token=Depends(cognito_auth.auth_required)):

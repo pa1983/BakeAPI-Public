@@ -181,6 +181,7 @@ class InvoiceRead(ParsedInvoiceDetails):
     invoice_image: Optional[ImageInvoiceRead]
     line_items: List[LineItemRead] = []
 
+
 if __name__ == '__main__':
     engine = engine
     SQLModel.metadata.create_all(engine)

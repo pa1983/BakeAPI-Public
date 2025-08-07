@@ -10,17 +10,30 @@ from sqlmodel import Session, select, and_, or_
 from starlette import status
 
 from app.api.v1.routers.brand import brandRouter
+from app.api.v1.routers.crud_factory import create_crud_router
 from app.api.v1.routers.supplier import supplierRouter
 from app.database.session import get_session
 from app.dependencies.user_dependencies import get_current_user
 
-from app.models.buyable import BuyableRead, Buyable
+from app.models.buyable import BuyableRead, Buyable, BuyableCreate, BuyableUpdate
 from app.models.brand import BrandCreate, Brand, BrandRead
 from app.models.common import ApiResponse
 from app.models.user import User
 
-buyableRouter: APIRouter = APIRouter()
 
+
+buyableRouter: APIRouter = create_crud_router(
+    model=Buyable,
+    create_schema=BuyableCreate,
+    read_schema=BuyableRead,
+    update_schema=BuyableUpdate,
+    prefix="",  #
+    tags=["Buyables"],
+    pk_field_name="id",
+    name_field="item_name"
+)
+
+#  add the descendent routers to the buyable router once it's full defined
 buyableRouter.include_router(
     brandRouter,
     prefix="/brand",
