@@ -1,3 +1,4 @@
+from http import HTTPStatus
 from typing import List
 
 from fastapi import APIRouter, Depends, status, HTTPException, UploadFile, File
@@ -65,16 +66,16 @@ async def title_get(session: Session = Depends(get_session)):
 
 @CommonRouter.get("/currency",
                   status_code=status.HTTP_200_OK,
-                  response_model=List[Currency])
+                  response_model=ApiResponse[List[Currency]])
 
-async def title_get(session: Session = Depends(get_session)) -> List[Currency]:
+async def title_get(session: Session = Depends(get_session)) -> ApiResponse[List[Currency]]:
     try:
         res = session.exec(select(Currency).order_by(Currency.currency_name)).all()
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Currency table not found")
 
-    return res
+    return ApiResponse(data=res, message="Currency list retrieved", status_code=HTTPStatus.OK)
 
 @CommonRouter.get("/supplier")
 async def get_invoice_form_data(session: Session = Depends(get_session),

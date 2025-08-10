@@ -29,7 +29,7 @@ from app.models.permission import Permission
 
 class MyCognitoSettings(CognitoSettings):
     userpools: Dict[str, Any] = {
-        "bokeonomics_userpool": {
+        "bakeonomics_userpool": {
             "region": settings.AWS_REGION,
             "userpool_id": settings.AWS_COGNITO_USERPOOL_ID,
             "app_client_id": settings.AWS_COGNITO_APP_CLIENT_ID

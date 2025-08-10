@@ -1,5 +1,3 @@
-# app/routers/brand.py
-
 from pydantic import BaseModel
 from typing import Optional
 from .crud_factory import create_crud_router
@@ -17,7 +15,7 @@ brandRouter = create_crud_router(
     read_schema=BrandRead,
     update_schema=BrandUpdate,
     prefix="",
-    tags=["Brands"],
+    tags=["Brand"],
     pk_field_name="brand_id",
     name_field="brand_name"
 )

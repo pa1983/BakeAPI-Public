@@ -28,7 +28,7 @@ buyableRouter: APIRouter = create_crud_router(
     read_schema=BuyableRead,
     update_schema=BuyableUpdate,
     prefix="",  #
-    tags=["Buyables"],
+    tags=["Buyable"],
     pk_field_name="id",
     name_field="item_name"
 )

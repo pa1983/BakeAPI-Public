@@ -14,10 +14,10 @@ from app.models.image import ImageRead
 
 
 class IngredientBase(SQLModel):
-    ingredient_name: str
-    standard_uom_id: int
+    ingredient_name: str = None
+    standard_uom_id: int = None
     density: Optional[float] = None
-    organisation_id: Optional[int] = None
+
     notes: Optional[str] = None
 
 
@@ -49,15 +49,17 @@ class IngredientRead(IngredientBase):
     ingredient_id: int
     created_timestamp: datetime
     modified_timestamp: datetime
-
-    standard_uom: UnitOfMeasureRead
-    organisation: Optional[OrganisationRead] # Made optional to match Ingredient's definition
-    image_links: List["Ingredient_Image"]
+        # trying removing the complex response data to see if it fixes error in ingredient POST response.  Don't plan to use these computed fields - separte calls to images when required may be easier to handle
+    image_links: List["Ingredient_Image"]  # duplicates function below to some extent, but present allows for simple re-ordering of ingredient images with a simple patch of image_id sort_order values, so retain
     @computed_field(return_type=List[ImageRead])  # Pydantic decorator - used to define a property whose value is dynamically computed from other fields in the model (in this case, after then main data is loaded)
     @property  # makes the images function accessible as if it were a class attribute
     def images(self) -> List[ImageRead]:
         sorted_image_links = sorted(self.image_links, key=lambda link: link.sort_order)  # apply sort order
         return [ImageRead.model_validate(link.image) for link in sorted_image_links if link.image]  # return only the image instance, in a sorted list
 
-class IngredientUpdateForm(IngredientBase):
-    standard_uom: Optional[UnitOfMeasureRead]
+class IngredientCreate(IngredientBase):
+    pass
+
+
+class IngredientUpdate(IngredientBase):
+    pass
