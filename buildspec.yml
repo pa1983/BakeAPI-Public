@@ -6,45 +6,37 @@ phases:
       - echo "--- PRE_BUILD PHASE ---"
       - echo "Making deployment scripts executable..."
       - chmod +x scripts/*.sh
-
-      # --- Variable Checks ---
       - echo "Verifying standard CodeBuild variables..."
-      - echo "AWS Default Region: $AWS_DEFAULT_REGION"
-      - echo "Source Version (Full Commit Hash): $CODEBUILD_RESOLVED_SOURCE_VERSION"
-
+      - echo "AWS Default Region- $AWS_DEFAULT_REGION"
+      - echo "Source Version (Full Commit Hash) -$CODEBUILD_RESOLVED_SOURCE_VERSION"
       - echo "Discovering AWS Account ID..."
       - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - echo "Discovered AWS Account ID: $AWS_ACCOUNT_ID"
-
+      - echo "Discovered AWS Account ID- $AWS_ACCOUNT_ID"
       - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION
-
-      # --- More Variable Checks ---
       - echo "Constructing ECR and Image Tag variables..."
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION/bake-api
-      - echo "Constructed Repository URI: $REPOSITORY_URI"
+      - echo "Constructed Repository URI- $REPOSITORY_URI"
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - echo "Generated Image Tag (Short Commit Hash): $IMAGE_TAG"
+      - echo "Generated Image Tag (Short Commit Hash)- $IMAGE_TAG"
 
   build:
     commands:
       - echo "--- BUILD PHASE ---"
       - echo "Build started on `date`"
-      - echo "Building the Docker image with tags: latest, $IMAGE_TAG"
-      - docker build -t $REPOSITORY_URI:latest .
-      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+      - echo "Building the Docker image with tags- latest, $IMAGE_TAG"
+      - "docker build -t $REPOSITORY_URI:latest ."  # <-- QUOTES ADDED
+      - "docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG" # <-- QUOTES ADDED
 
   post_build:
     commands:
       - echo "--- POST_BUILD PHASE ---"
       - echo "Build completed on `date`"
       - echo "Pushing the Docker images to $REPOSITORY_URI"
-      - docker push $REPOSITORY_URI:latest
-      - docker push $REPOSITORY_URI:$IMAGE_TAG
-
-      # --- Final Artifact Check ---
+      - "docker push $REPOSITORY_URI:latest" # <-- QUOTES ADDED
+      - "docker push $REPOSITORY_URI:$IMAGE_TAG" # <-- QUOTES ADDED
       - echo "Writing image definitions file..."
-      - printf '[{"name":"bake-api-container","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
+      - "printf '[{\"name\":\"bake-api-container\",\"imageUri\":\"%s\"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json" # <-- QUOTES ADDED
       - echo "Contents of imagedefinitions.json:"
       - cat imagedefinitions.json
 
