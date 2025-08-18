@@ -8,7 +8,7 @@ ingredientBuyableRouter = create_crud_router(
     read_schema = IngredientBuyableRead,
     update_schema=IngredientBuyableUpdate,
     prefix="",
-    tags=["Ingredient Buyable"],
+    tags=["Ingredient"],
     pk_field_name="id",
     name_field="ingredient_buyable_link",
     filter_by_field="ingredient_id"  # filters the /all endpoint to only return entries for ingredient_id in the all params, i.e. all?ingredient_id=23

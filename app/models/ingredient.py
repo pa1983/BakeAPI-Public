@@ -11,7 +11,9 @@ from app.models.ingredient_image import Ingredient_Image, Ingredient_ImageRead
 from app.models.organisation import Organisation, OrganisationRead
 from app.models.uom import UnitOfMeasure, UnitOfMeasureRead
 from app.models.image import ImageRead
-
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.models.recipe_ingredient import RecipeIngredient
 
 class IngredientBase(SQLModel):
     ingredient_name: str = None
@@ -36,13 +38,14 @@ class Ingredient(IngredientBase, table=True):
                                          sa_column_kwargs={"onupdate": func.now()})  # need to call sqlalchmeny now here or won't update as expected
 
     # note use of string literal below to avoid circular import errors if use direct class reference
-    standard_uom: "UnitOfMeasure" = Relationship(back_populates="ingredients")
-    organisation: Optional["Organisation"] = Relationship(back_populates="ingredients")
+    standard_uom: "UnitOfMeasure" = Relationship()
+    organisation: Optional["Organisation"] = Relationship()  #back_populates="ingredients"
     # Direct many-to-many relationship to Image via IngredientImage link model
     # 'images' is the new relationship attribute on Ingredient
     image_links: List["Ingredient_Image"] = Relationship(
         back_populates="ingredient"  # relates the name of the relationship on the Image model
     )
+    recipe_links: List["RecipeIngredient"] = Relationship(back_populates="ingredient")
 
 
 class IngredientRead(IngredientBase):

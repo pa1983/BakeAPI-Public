@@ -47,248 +47,96 @@ IngredientRouter = create_crud_router(
     name_field="ingredient_name",
     get_query_options=[
         selectinload(Ingredient.image_links).selectinload(Ingredient_Image.image),
-    ]  # custom options to pull linked data for images via the image_links linking table (ingredient_image)
+    ],  # custom options to pull linked data for images via the image_links linking table (ingredient_image)
+    parent_fk_field='ingredient_id',  # todo - when is this going to differ from pk_field_name?  ever?
+    image_link_model=Ingredient_Image,
+    attach_image_upload_endpoint=True
+
 )
 
 IngredientRouter.include_router(ingredientBuyableRouter, prefix="/link_buyable")
 
 # todo - add cascading delete f linked buyables and images if an ingredient is deleted.  Additional query options?  Extra delete_query_optons optional parameter to ensure cascades are completed?
 
+IngredientImageRouter = create_crud_router(
+    model=Ingredient_Image,
+    create_schema=Ingredient_ImageCreate,
+    read_schema=Ingredient_ImageRead,
+    update_schema=Ingredient_ImageUpdate,
+    prefix="",
+    tags=["Ingredient Image"],
+    pk_field_name="id",
+    filter_by_field="ingredient_id",  # this filters all the ingredient_image elements by ingredient id
+    parent_fk_field="ingredient_id",
+    name_field="ingredient_name",
+    is_image_link_model=True
+)
+
+
+
+
 #
-# def print_location():
-#     print("Got here")
-#
-#
-# @IngredientRouter.get("/all", response_model=Page[IngredientRead])
-# async def get_ingredients(
-#         tst=Depends(print_location),
-#         session: Session = Depends(get_session),
-#         user: User = Depends(get_current_user),
-#         ingredient_name: Optional[str] = Query(None, description="Filter ingredients by name (case insensative)"),
-#         own_organisation: Optional[bool] = Query(None,
-#                                                  description="Show only ingredients that belong to user's organisation")
-#         # todo - add more filter types, e.g. ingredient type?  ONLY those owned by organisation (not NONE)
-#         # todo - add auth required - disabled for testing
-# ) -> IngredientRead:
+# #############IMAGE ENDPOINTS - special additions to the generic ingredient endpoints produced by the crud factory ####################
+# # todo - cosider nesting these further in their own .py file to keep code tidy - ingredient will be big enough
+# @IngredientRouter.post("/image/upload")
+# async def image_upload_post(file: UploadFile = File(...),
+#                             caption: str = Form(...),
+#                             alt_text: str = Form(...),
+#                             ingredient_id: int = Form(...),
+#                             session: Session = Depends(get_session),
+#                             user: User = Depends(get_current_user)
+#                             ) -> ApiResponse[None]:
 #     """
-#     Get all ingredients available to current signed in user.
-#     Returns nested objects, so each ingredient instance contains any available photos and UOM details
+#     Upload an image file to S3 and log necessary metadata to database.
+#     Build links to ingredients table
 #
-#     :param own_organisation: Boolean - filter results to only show user their own organisation's custom ingredients (no system generics)
-#     :param ingredient_name: Filter response for insensative contains ingredient_name in ingredient_name
-#     :param session:
-#     :param user:
-#
-#     Additional params available for pagination - page, size
-#
-#     :return:
-#
-#
-#     """
-#     # user = User(organisation_id=1, user_id=1)
-#     # user.organisation_id = 1;
-#     # todo - break out statements into separte file -will make query testing simpler and keep this tidier
-#     # logger.debug(f"Getting ingredients.  Org ID {user.organisation_id}")
-#     statement = (
-#         select(Ingredient)
-#
-#         .options(
-#             selectinload(Ingredient.image_links).selectinload(Ingredient_Image.image)
-#             # image_links links image to the M:M joining table; ingredient_image.image does the same on the other side of the joining table
-#         )
-#     )
-#
-#     # filtering logic based on parameters
-#     if ingredient_name:
-#         statement = statement.where(Ingredient.ingredient_name.ilike(
-#             f"%{ingredient_name}%"))  # ilike for case-insensative comparison. %{}% for 'contains' search
-#
-#     if own_organisation:
-#         statement = statement.where(Ingredient.organisation_id == user.organisation_id)
-#     else:
-#         statement = statement.where(
-#             or_(Ingredient.organisation_id == user.organisation_id,
-#                 Ingredient.organisation_id.is_(None)))
-#     # Take the built statement, and pass to sqlmodel_paginate, along with the current DB session, to send paginated results
-#
-#     # res = (session.exec(statement).all())
-#     # Take the list of ingredient objects, and run model validate.  Need to pass in the list as a dict with key
-#     # 'ingredients' to match the name of the field found in IngredientListRead
-#     # ingredients: IngredientListRead = IngredientListRead.model_validate({"ingredients": res})
-#     # return ingredients
-#     return sqlmodel_paginate(session, statement)
-#
-#
-#
-# @IngredientRouter.post("/",
-#                         status_code=status.HTTP_201_CREATED,
-#                         response_model=ApiResponse[IngredientRead | None])
-# async def post_ingredient(session: Session = Depends(get_session),
-#                            user: User = Depends(get_current_user),
-#                            form_data: IngredientBase = Body(...)
-#                            ) -> ApiResponse:
-#
-#     # start by getting current ingredient instance from the DB, checking that the user is from correct org before pulling
-#     try:
-#         ingredient = Ingredient.model_validate(form_data)
-#         ingredient.organisation_id = user.organisation_id
-#         session.add(ingredient)
-#         session.commit()
-#         session.refresh(ingredient)
-#         responseIngredient: IngredientRead = IngredientRead.model_validate(ingredient)
-#
-#         return ApiResponse(message="Ingredient updated successfully", data=responseIngredient)
-#
-#     except Exception as e:
-#         # the ingredient doesn't exist, or doesn't belong to the user's org so can't be udpdated
-#         return ApiResponse(message="Ingredient not found", status_code=status.HTTP_403_FORBIDDEN, data=None)
-#
-#
-# @IngredientRouter.patch("/id/{ingredient_id}",
-#                        status_code=status.HTTP_202_ACCEPTED,
-#                        response_model=ApiResponse[IngredientRead | None])
-# async def patch_ingredient(ingredient_id: int,
-#                            session: Session = Depends(get_session),
-#                            user: User = Depends(get_current_user),
-#                            form_data: IngredientBase = Body(...)
-#                            ) -> ApiResponse:
-#
-#     # start by getting current ingredient instance from the DB, checking that the user is from correct org before pulling
-#
-#     ingredient: Ingredient = session.exec(
-#         (
-#             select(Ingredient)
-#             .where(
-#                 and_(Ingredient.ingredient_id == ingredient_id,
-#                      Ingredient.organisation_id == user.organisation_id
-#                      )
-#             )
-#
-#         )
-#     ).first()
-#     if ingredient:
-#         update_data = form_data.model_dump(exclude_unset=True)  # only update for present values - avoid overwriting for missing fields
-#         for key, value in update_data.items():
-#             setattr(ingredient, key, value)
-#         session.add(ingredient)
-#         session.commit()
-#         session.refresh(ingredient)
-#         responseIngredient: IngredientRead = IngredientRead.model_validate(ingredient)
-#
-#         return ApiResponse(message="Ingredient updated successfully", status_code=status.HTTP_202_ACCEPTED, data=responseIngredient)
-#
-#     else:
-#         # the ingredient doesn't exist, or doesn't belong to the user's org so can't be udpdated
-#         return ApiResponse(message="Ingredient not found", status_code=status.HTTP_403_FORBIDDEN, data=None)
-#
-#
-# @IngredientRouter.get("/id/{ingredient_id}",
-#                        status_code=status.HTTP_200_OK,
-#                        response_model=ApiResponse[IngredientRead])
-# async def get_ingredient(ingredient_id: int,
-#                    session: Session = Depends(get_session),
-#                    user: User = Depends(get_current_user)
-#
-#                    ) -> ApiResponse[IngredientRead]:
-#     """
-#     Get a single ingredient by ID
+#     :param file: a FastAPI UploadFile instance
+#     :param caption:
+#     :param alt_text:
 #     :param ingredient_id:
 #     :param session:
 #     :param user:
 #     :return:
 #     """
-#     print(f'getting ingredient data for ID: {ingredient_id}')
-#     # look up the ingredient ID, and confirm that it belongs to the org id OR is a generic for use by all users
-#     statement = (
-#         select(Ingredient)
-#         .where(
-#             and_(Ingredient.ingredient_id == ingredient_id,
-#                  or_(Ingredient.organisation_id == user.organisation_id,
-#                      Ingredient.organisation_id.is_(None)))
-#         )
-#         .options(
-#             selectinload(Ingredient.image_links).selectinload(Ingredient_Image.image)
-#             # image_links links image to the M:M joining table; ingredient_image.image does the same on the other side of the joining table
-#         )
-#     )
-#     res = (session.exec(
-#         statement
-#     )
-#            .first())
+#     try:
+#         s3_key = s3_handler.push_UploadFile_to_s3(file, directory="image")  # todo - consider enum-ing this
+#         logger.debug(f"File pushed to S3: {s3_key}")
 #
-#     # Pydantic's model_validate automatically handles the nested list of ImageRead due to the direct relationship
-#     ingredient_read_instance = IngredientRead.model_validate(res)
+#         filename, extension = os.path.splitext(file.filename)
 #
-#     return ApiResponse(data=ingredient_read_instance, message=f'Ingredient Found')
+#         image = Image(
+#             file_name=filename,
+#             file_ext=extension,
+#             file_size=file.size,
+#             mime_type=file.content_type,
+#             alt_text=alt_text,
+#             caption=caption,
+#             organisation_id=user.organisation_id,
+#             s3_key=s3_key)
 #
-
-# todo - bear in mind that ingredient returned should be FUNCTIONALLY useful, i.e. include any image URLs, type descrtiptions etc.
-# todo - pick up here and try to get an ingredient pulled by ID, then confirm that it matches the current user's org
-
-
-
-
-#############IMAGE ENDPOINTS ####################
-# todo - cosider nesting these further in their own .py file to keep code tidy - ingredient will be big enough
-@IngredientRouter.post("/image/upload")
-async def image_upload_post(file: UploadFile = File(...),
-                            caption: str = Form(...),
-                            alt_text: str = Form(...),
-                            ingredient_id: int = Form(...),
-                            session: Session = Depends(get_session),
-                            user: User = Depends(get_current_user)
-                            ) -> ApiResponse[None]:
-    """
-    Upload an image file to S3 and log necessary metadata to database.
-    Build links to ingredients table
-
-    :param file: a FastAPI UploadFile instance
-    :param caption:
-    :param alt_text:
-    :param ingredient_id:
-    :param session:
-    :param user:
-    :return:
-    """
-    try:
-        s3_key = s3_handler.push_UploadFile_to_s3(file, directory="image")  # todo - consider enum-ing this
-        logger.debug(f"File pushed to S3: {s3_key}")
-
-        filename, extension = os.path.splitext(file.filename)
-
-        image = Image(
-            file_name=filename,
-            file_ext=extension,
-            file_size=file.size,
-            mime_type=file.content_type,
-            alt_text=alt_text,
-            caption=caption,
-            organisation_id=user.organisation_id,
-            s3_key=s3_key)
-
-        session.add(image)
-        session.flush()  # flush in the image to get an ID for use in the link table
-        logger.debug(image.image_id)
-
-        ingredient_image_link = Ingredient_Image(ingredient_id=ingredient_id,
-                                                 image_id=image.image_id)
-        session.add(ingredient_image_link)
-        session.commit()
-
-        return ApiResponse(data=None, message=f"File uploaded successfully {file.filename} with s3 key {s3_key}")
-    except Exception as e:
-        session.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f"Error uploading file - please try again: {e}")
-
-
-@IngredientRouter.get("/image/delete")
-async def image_delete_get(s3_object_key: str,
-                           session: Session = Depends(get_session),
-                           current_user: User = Depends(get_current_user)):
-    # check that the user us linked to the image via organisation
-    # delete the image
-    s3_handler.delete_s3_object(s3_object_key)
-    # delete related database objects: ingredient_image entry, image entry
-
-    # send 201 response
+#         session.add(image)
+#         session.flush()  # flush in the image to get an ID for use in the link table
+#         logger.debug(image.image_id)
+#
+#         ingredient_image_link = Ingredient_Image(ingredient_id=ingredient_id,
+#                                                  image_id=image.image_id)
+#         session.add(ingredient_image_link)
+#         session.commit()
+#
+#         return ApiResponse(data=None, message=f"File uploaded successfully {file.filename} with s3 key {s3_key}")
+#     except Exception as e:
+#         session.rollback()
+#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                             detail=f"Error uploading file - please try again: {e}")
+#
+#
+# @IngredientRouter.get("/image/delete")
+# async def image_delete_get(s3_object_key: str,
+#                            session: Session = Depends(get_session),
+#                            current_user: User = Depends(get_current_user)):
+#     # check that the user us linked to the image via organisation
+#     # delete the image
+#     s3_handler.delete_s3_object(s3_object_key)
+#     # delete related database objects: ingredient_image entry, image entry
+#
+#     # send 201 response

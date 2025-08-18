@@ -11,6 +11,7 @@ from fastapi_pagination.ext.sqlmodel import paginate as sqlmodel_paginate  # SQL
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select, and_, or_
 
+from app.api.v1.routers.crud_factory import create_crud_router
 from app.core.logging_config import logger
 from app.database.session import get_session
 from app.dependencies.user_dependencies import get_current_user
@@ -21,7 +22,8 @@ from app.models.buyable import Buyable
 from app.models.common import ApiResponse
 from app.models.currency import Currency
 from app.models.general import updateDataModel
-from app.models.invoice import Invoice, InvoiceListResponse, LineItem, InvoiceRead
+from app.models.invoice import Invoice, InvoiceListResponse, LineItem, InvoiceRead, LineItemCreate, LineItemUpdate, \
+    LineItemRead
 from app.models.supplier import Supplier
 from app.models.user import User
 from app.models.ingredient import Ingredient, Ingredient_Image, IngredientRead, IngredientBase
@@ -246,15 +248,17 @@ async def delete_invoice(id: int, session: Session = Depends(get_session),
     return ApiResponse(status_code=HTTPStatus.NO_CONTENT, message=f"Invoice {id} deleted successfully", data=None)
 
 
-@InvoiceRouter.patch("/lineitem/{id}")
-async def update_invoice_line_item_field(data: updateDataModel,
-                                         id: int, session: Session = Depends(get_session),
-                                         user: User = Depends(get_current_user), ):
-    line_item = session.exec(select(LineItem).join(Invoice).where(
-        and_(LineItem.id == id, Invoice.organisation_id == user.organisation_id))).first()
-    setattr(line_item, data.field_name, data.new_value)
-    session.commit()
 
+
+# @InvoiceRouter.patch("/lineitem/{id}")
+# async def update_invoice_line_item_field(data: updateDataModel,
+#                                          id: int, session: Session = Depends(get_session),
+#                                          user: User = Depends(get_current_user), ):
+#     line_item = session.exec(select(LineItem).join(Invoice).where(
+#         and_(LineItem.id == id, Invoice.organisation_id == user.organisation_id))).first()
+#     setattr(line_item, data.field_name, data.new_value)
+#     session.commit()
+#
 
 class InvoiceUpdate(BaseModel):
     """
@@ -320,3 +324,16 @@ async def update_invoice_field(
     return ApiResponse(status_code=HTTPStatus.NO_CONTENT,
                        message=f"invoice id {id}, updated",
                        data=None)
+
+
+InvoiceLineItemRouter: APIRouter = create_crud_router(
+    model=LineItem,
+    create_schema=LineItemCreate,
+    read_schema=LineItemRead,
+    update_schema=LineItemUpdate,
+    prefix="/lineitem",
+    pk_field_name="id",
+    name_field="description",
+    filter_by_field="invoice_id"
+)
+InvoiceRouter.include_router(InvoiceLineItemRouter)

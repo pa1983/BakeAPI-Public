@@ -11,7 +11,7 @@ class Organisation(SQLModel, table=True):
     roles: List["Role"] = Relationship(back_populates="organisation")
     # Define the back-populating relationship to Ingredient
     # The 'ingredients' here matches back_populates="ingredients" in Ingredient model
-    ingredients: List["Ingredient"] = Relationship(back_populates="organisation")
+    # ingredients: List["Ingredient"] = Relationship(back_populates="organisation")
     images: List["Image"] = Relationship(back_populates="organisation")
     users: List["User"] = Relationship(back_populates="organisation")
 

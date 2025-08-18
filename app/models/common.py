@@ -1,6 +1,7 @@
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Optional
 
 from pydantic import BaseModel
+from sqlmodel import SQLModel, Field
 
 T = TypeVar('T')
 
@@ -22,3 +23,5 @@ class ApiResponse(BaseModel, Generic[T]):
     data: T|None = None  # generic data type to store any resonse data type.  Allow none for successful POST of data, etc
     message: str = "Operation Successful"  # Default message; can be overridden before sending response
     status_code: int = 200  # Default status; can be overridden before sending
+
+

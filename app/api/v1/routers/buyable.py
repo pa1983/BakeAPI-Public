@@ -33,7 +33,7 @@ buyableRouter: APIRouter = create_crud_router(
     name_field="item_name"
 )
 
-#  add the descendent routers to the buyable router once it's full defined
+#  add the descendent routers to the buyable router once it's fully defined
 buyableRouter.include_router(
     brandRouter,
     prefix="/brand",

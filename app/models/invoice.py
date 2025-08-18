@@ -1,10 +1,9 @@
 import decimal
 import json
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import List, Optional
 
-from pydantic import BaseModel
-from sqlalchemy import String
 from sqlmodel import SQLModel, Relationship, Field
 
 from app.database.session import engine
@@ -136,24 +135,59 @@ class LineItem(ParsedLineItem, SQLModel, table=True):
     """
     Extends ParsedLineItem, to take the parsed data and add links to the parent invoice ID, line item ID etc
     """
+    __tablename__ = 'lineitem'
     id: Optional[int] = Field(primary_key=True, description="Line item ID")
     invoice_id: Optional[int] = Field(default=None, description='Reference to parent invoice ID', foreign_key="invoice.id")
     invoice: Optional[Invoice] = Relationship(back_populates="line_items")
+    buyable_id: Optional[int] = Field(default=None, foreign_key="buyable.id") # these 3 fields are what downstream queries will use for costing calculations so need to be complete and accurate
+    buyable_quantity: Optional[Decimal] = Field(default=None, max_digits=8, decimal_places=3)
+    unit_cost: Optional[Decimal] = Field(default=None, max_digits=8, decimal_places=3)
+    organisation_id: Optional[int] = Field(default=None, foreign_key="organisation.organisation_id")
 
-class LineItemRead(BaseModel):
+class LineItemRead(SQLModel):
     id: Optional[int]
     cases: Optional[int]
     units: Optional[int]
-    description: str
+    description: Optional[str]
     size: Optional[str]
     code: Optional[str]
-    value_ex_vat: float
-    value_inc_vat: float
-    vat_percentage: float
-    is_delivery: bool
+    value_ex_vat: Optional[float]
+    value_inc_vat: Optional[float]
+    vat_percentage: Optional[float]
+    is_delivery: Optional[bool]
+    buyable_id: Optional[int]
+    buyable_quantity: Optional[Decimal]
+    unit_cost: Optional[Decimal]
 
+class LineItemUpdate(SQLModel):
+    cases: Optional[int] = None
+    units: Optional[int]= None
+    description: str= None
+    size: Optional[str]= None
+    code: Optional[str]= None
+    value_ex_vat: Optional[float]= None
+    value_inc_vat: Optional[float]= None
+    vat_percentage: Optional[float]= None
+    is_delivery: bool= False
+    buyable_id: Optional[int] = None
+    buyable_quantity: Optional[Decimal] = None
+    unit_cost: Optional[Decimal] = None
 
-class InvoiceListResponse(BaseModel):
+class LineItemCreate(SQLModel):
+    cases: Optional[int]
+    units: Optional[int]
+    description: Optional[str]
+    size: Optional[str]
+    code: Optional[str]
+    value_ex_vat: Optional[float]
+    value_inc_vat: Optional[float]
+    vat_percentage: Optional[float]
+    is_delivery: Optional[bool]
+    buyable_id: Optional[int]
+    buyable_quantity: Optional[Decimal]
+    unit_cost: Optional[Decimal]
+
+class InvoiceListResponse(SQLModel):
     """
     Used for calls to invoice/invoices endpoint to display list of invoices
     """

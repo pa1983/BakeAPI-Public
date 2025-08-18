@@ -24,9 +24,7 @@ class UnitOfMeasure(UnitOfMeasureBase, table=True):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     uom_id: Optional[int] = Field(default=None, primary_key=True)
 
-    ingredients: List["Ingredient"] = Relationship(
-        back_populates="standard_uom"
-    )
+
 
 class UnitOfMeasureRead(UnitOfMeasureBase):
     # inherits all parent fields

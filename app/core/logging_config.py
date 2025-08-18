@@ -1,5 +1,6 @@
 import logging
 import sys
+from logging import Logger
 from logging.config import dictConfig
 
 import pythonjsonlogger  # import not required here, but is included to ensure it's included in requirements.txt to
@@ -76,4 +77,4 @@ LOGGING_CONFIG = {
 }
 
 dictConfig(LOGGING_CONFIG)
-logger = logging.getLogger("app")
+logger: Logger = logging.getLogger("app")
