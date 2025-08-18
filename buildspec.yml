@@ -13,9 +13,9 @@ phases:
       - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - echo "Discovered AWS Account ID- $AWS_ACCOUNT_ID"
       - echo "Logging in to Amazon ECR..."
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION..amazonaws.com
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - echo "Constructing ECR and Image Tag variables..."
-      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION/bake-api
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/bake-api
       - echo "Constructed Repository URI- $REPOSITORY_URI"
       - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - echo "Generated Image Tag (Short Commit Hash)- $IMAGE_TAG"
@@ -25,18 +25,18 @@ phases:
       - echo "--- BUILD PHASE ---"
       - echo "Build started on `date`"
       - echo "Building the Docker image with tags- latest, $IMAGE_TAG"
-      - "docker build -t $REPOSITORY_URI:latest ."  # <-- QUOTES ADDED
-      - "docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG" # <-- QUOTES ADDED
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
 
   post_build:
     commands:
       - echo "--- POST_BUILD PHASE ---"
       - echo "Build completed on `date`"
       - echo "Pushing the Docker images to $REPOSITORY_URI"
-      - "docker push $REPOSITORY_URI:latest" # <-- QUOTES ADDED
-      - "docker push $REPOSITORY_URI:$IMAGE_TAG" # <-- QUOTES ADDED
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo "Writing image definitions file..."
-      - "printf '[{\"name\":\"bake-api-container\",\"imageUri\":\"%s\"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json" # <-- QUOTES ADDED
+      - printf '[{"name":"bake-api-container","imageUri":"%s"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json
       - echo "Contents of imagedefinitions.json:"
       - cat imagedefinitions.json
 
