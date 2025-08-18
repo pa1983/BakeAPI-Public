@@ -3,6 +3,10 @@ version: 0.2
 phases:
   pre_build:
     commands:
+      - echo "Making deployment scripts executable..."
+      - chmod +x scripts/*.sh
+      - echo "Discovering AWS Account ID..."
+      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION/bake-api
