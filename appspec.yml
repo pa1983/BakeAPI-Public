@@ -2,13 +2,14 @@ version: 0.0
 os: linux
 files:
   - source: /
-    destination: /home/ec2-user/app
+    destination: /home/ec2-user/bake-api
+
 hooks:
-  ApplicationStop:
+  BeforeInstall:
     - location: scripts/stop_container.sh
       timeout: 300
       runas: ec2-user
-  ApplicationStart:
+  AfterInstall:
     - location: scripts/start_container.sh
       timeout: 300
       runas: ec2-user
