@@ -10,7 +10,7 @@ phases:
       - echo "AWS Default Region: $AWS_DEFAULT_REGION"
       - echo "Source Version (Full Commit Hash): $CODEBUILD_RESOLVED_SOURCE_VERSION"
       - echo "Discovering AWS Account ID..."
-      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)"
       - echo "Discovered AWS Account ID: $AWS_ACCOUNT_ID"
 
   build:
@@ -19,7 +19,6 @@ phases:
       - "REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/bake-api"
       - "IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)"
       - "echo Building Docker image $REPOSITORY_URI:$IMAGE_TAG"
-      # Quote the docker commands to prevent YAML parsing errors around the colons
       - "docker build -t $REPOSITORY_URI:latest ."
       - "docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG"
 
