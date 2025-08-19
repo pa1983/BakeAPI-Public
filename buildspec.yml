@@ -3,18 +3,18 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - echo "--- PRE_BUILD PHASE ---"
-      - echo "Making deployment scripts executable..."
-      - chmod +x scripts/*.sh
-      - echo "Verifying CodeBuild variables..."
-      - echo "AWS Default Region: $AWS_DEFAULT_REGION"
-      - echo "Source Version: $CODEBUILD_RESOLVED_SOURCE_VERSION"
+      - "echo '--- PRE_BUILD PHASE ---'"
+      - "echo 'Making deployment scripts executable...'"
+      - "chmod +x scripts/*.sh"
+      - "echo 'Verifying CodeBuild variables...'"
+      - "echo 'AWS Default Region: $AWS_DEFAULT_REGION'"
+      - "echo 'Source Version: $CODEBUILD_RESOLVED_SOURCE_VERSION'"
       - "AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)"
-      - echo "AWS Account ID: $AWS_ACCOUNT_ID"
+      - "echo 'Discovered AWS Account ID: $AWS_ACCOUNT_ID'"
 
   build:
     commands:
-      - echo "--- BUILD PHASE ---"
+      - "echo '--- BUILD PHASE ---'"
       - "REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/bake-api"
       - "IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)"
       - "echo Building Docker image $REPOSITORY_URI:$IMAGE_TAG"
