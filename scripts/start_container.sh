@@ -1,19 +1,26 @@
 #!/bin/bash
 set -e
 
-REPO_URI="260718839331.dkr.ecr.eu-west-1.amazonaws.com/bake-api"
-IMAGE_TAG="latest"
+IMAGE_URI="260718839331.dkr.ecr.eu-west-1.amazonaws.com/bake-api:latest"
 CONTAINER_NAME="bake-api"
-PORT="8000"
+PARAM_PATH="/bake-api/prod"
+TEMP_ENV_FILE=$(mktemp)
 
-echo "Stopping existing container (if any)..."
-docker stop $CONTAINER_NAME || true
-docker rm $CONTAINER_NAME || true
+echo "Fetching parameters from AWS Parameter Store..."
 
-echo "Pulling Docker image $REPO_URI:$IMAGE_TAG..."
-docker pull $REPO_URI:$IMAGE_TAG
+# Fetch all parameters under the specified path and format them into a .env file
+aws ssm get-parameters-by-path --path "$PARAM_PATH" --with-decryption --query "Parameters" | \
+jq -r '.[] | .Name + "=" + .Value' | \
+sed "s#$PARAM_PATH/##" > "$TEMP_ENV_FILE"
 
-echo "Starting new container..."
-docker run -d --name $CONTAINER_NAME -p $PORT:$PORT $REPO_URI:$IMAGE_TAG
+echo "Pulling latest Docker image..."
+docker pull $IMAGE_URI
 
-echo "Container $CONTAINER_NAME started on port $PORT."
+echo "Starting new container with fetched environment variables..."
+docker run -d -p 8000:8000 --name $CONTAINER_NAME --rm --env-file "$TEMP_ENV_FILE" $IMAGE_URI
+
+# Clean up the temporary file
+rm "$TEMP_ENV_FILE"
+
+echo "Container started successfully."
+exit 0
