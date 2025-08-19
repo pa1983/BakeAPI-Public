@@ -1,12 +1,19 @@
 #!/bin/bash
 set -e
 
-AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-AWS_DEFAULT_REGION="eu-west-1"
-REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/bake-api
+REPO_URI="260718839331.dkr.ecr.eu-west-1.amazonaws.com/bake-api"
+IMAGE_TAG="latest"
+CONTAINER_NAME="bake-api"
+PORT="8000"
 
-echo "Pulling latest Docker image..."
-docker pull $REPOSITORY_URI:latest
+echo "Stopping existing container (if any)..."
+docker stop $CONTAINER_NAME || true
+docker rm $CONTAINER_NAME || true
 
-echo "Starting new container on port 8000..."
-docker run -d --name bake-api -p 8000:8000 $REPOSITORY_URI:latest
+echo "Pulling Docker image $REPO_URI:$IMAGE_TAG..."
+docker pull $REPO_URI:$IMAGE_TAG
+
+echo "Starting new container..."
+docker run -d --name $CONTAINER_NAME -p $PORT:$PORT $REPO_URI:$IMAGE_TAG
+
+echo "Container $CONTAINER_NAME started on port $PORT."

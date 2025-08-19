@@ -4,12 +4,20 @@ files:
   - source: /
     destination: /home/ec2-user/bake-api
 
+permissions:
+  - object: /home/ec2-user/bake-api/scripts/start_container.sh
+    pattern: "*.sh"
+    owner: ec2-user
+    group: ec2-user
+    mode: 0755
+
 hooks:
   BeforeInstall:
-    - location: scripts/stop_container.sh
+    - location: scripts/login_ecr.sh
       timeout: 300
       runas: ec2-user
-  AfterInstall:
+
+  ApplicationStart:
     - location: scripts/start_container.sh
       timeout: 300
       runas: ec2-user
