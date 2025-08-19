@@ -17,7 +17,8 @@ echo "Pulling latest Docker image..."
 docker pull $IMAGE_URI
 
 echo "Starting new container with fetched environment variables..."
-docker run -d -p 8000:8000 --name $CONTAINER_NAME --rm --env-file "$TEMP_ENV_FILE" $IMAGE_URI
+echo "Temporarily removed  --rm from run config to leave container in place in case of error for debugging "
+docker run -d -p 8000:8000 --name $CONTAINER_NAME --env-file "$TEMP_ENV_FILE" $IMAGE_URI
 
 # Clean up the temporary file
 rm "$TEMP_ENV_FILE"
