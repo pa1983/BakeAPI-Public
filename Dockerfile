@@ -5,7 +5,9 @@
 # require compilation. This keeps our final image clean, as build tools
 # and development libraries won't be included in the runtime stage.
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-FROM python:3.13 AS builder
+# changed from docker hub images to ECR images - builds that ran locally were failing due to the
+# rate limits imposed by docker hub on individual IP address.  ECR repos get around this.
+FROM public.ecr.aws/docker/library/python:3.13 AS builder
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -44,7 +46,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Python base and only contains the installed dependencies and our app code.
 # It's much smaller and more secure than the builder stage.
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-FROM python:3.13-slim-bookworm AS runtime
+FROM public.ecr.aws/docker/library/python:3.13-slim-bookworm AS runtime
 
 # Set the working directory
 WORKDIR /app
