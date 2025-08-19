@@ -1,18 +1,21 @@
 #!/bin/bash
+set -e
 
 CONTAINER_NAME="bake-api"
 
-# Use docker ps -q to check if a container with that name is running.
-# The output will be a container ID if it exists, or empty if it doesn't.
-if [ "$(docker ps -q -f name=^/${CONTAINER_NAME}$)" ]; then
-    echo "Found running container ${CONTAINER_NAME}. Stopping and removing it."
-    docker stop ${CONTAINER_NAME}
+# Check if any container with that name exists (running or stopped  -a flag).
+if [ "$(docker ps -aq -f name=^/${CONTAINER_NAME}$)" ]; then
+    echo "Found container ${CONTAINER_NAME}. Stopping and removing it."
+
+    # Stop the container if it is running
+    if [ "$(docker ps -q -f name=^/${CONTAINER_NAME}$)" ]; then
+        docker stop ${CONTAINER_NAME}
+    fi
+
+    # Remove the container
     docker rm ${CONTAINER_NAME}
 else
     echo "Container ${CONTAINER_NAME} not found. Nothing to do."
 fi
 
-# Optional: Prune old, unused images to save disk space
-docker image prune -a -f
-
-exit 0 # Always exit with a success code
+exit 0
