@@ -39,9 +39,21 @@ from app.services.s3_handler import delete_s3_object
 
 InvoiceRouter: APIRouter = APIRouter()
 
+InvoiceLineItemRouter: APIRouter = create_crud_router(
+    model=LineItem,
+    create_schema=LineItemCreate,
+    read_schema=LineItemRead,
+    update_schema=LineItemUpdate,
+    prefix="/lineitem",
+    pk_field_name="id",
+    name_field="description",
+    filter_by_field="invoice_id"
+)
 
+# include the lineitem router BEFORE other invoice endpoints so that the more specific endpoints of invoice/lineitem
+# are tried before the less specific invoice endpoints
+InvoiceRouter.include_router(InvoiceLineItemRouter)
 # prefix: /invoice
-
 
 
 @InvoiceRouter.get("/{invoice_id}/file_url")
@@ -74,6 +86,29 @@ async def get_invoice_file_url(invoice_id: int,
         logger.debug(s3_psk_url)
         return ApiResponse(status_code=HTTPStatus.OK, message="Invoice Found", data=s3_psk_url)
 
+
+@InvoiceRouter.get("/new")
+async def invoiceNew(session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    """
+    Alternative method of creating new invoice, rather than uploading an invoice document and having the parser
+    create the initial fields.
+    todo - move all invoice functionality over to the crud-factory approach to keep methodology consistent
+    :param session:
+    :param user:
+    :return:
+    """
+    # create a blank invoice entry to get an id, pass this back to the front end, which will redirect to
+    # /invoice/id - messy and inefficient but required to quickly populate sample data - will be fixed later
+    try:
+        empty_invoice = Invoice(organisation_id=user.organisation_id)
+        session.add(empty_invoice)
+        session.commit()
+        session.refresh(empty_invoice)
+        response = ApiResponse(data=empty_invoice, message="New Invoice Created", status_code=200)
+    except Exception as e:
+        print(e)
+        return ApiResponse(data=None, message=f"Error creating new invoice", status_code=500)
+    return response
 
 @InvoiceRouter.post("/")
 async def invoice_upload_post(file: UploadFile = File(...),
@@ -248,8 +283,6 @@ async def delete_invoice(id: int, session: Session = Depends(get_session),
     return ApiResponse(status_code=HTTPStatus.NO_CONTENT, message=f"Invoice {id} deleted successfully", data=None)
 
 
-
-
 # @InvoiceRouter.patch("/lineitem/{id}")
 # async def update_invoice_line_item_field(data: updateDataModel,
 #                                          id: int, session: Session = Depends(get_session),
@@ -283,8 +316,6 @@ class InvoiceUpdate(BaseModel):
     status: Optional[str] = None
     received_date: Optional[datetime] = None
     notes: Optional[str] = None
-
-
 
 
 # todo - look at integrating the crud_factory here, along with the additional functions required for the more complex invoice.
@@ -326,14 +357,5 @@ async def update_invoice_field(
                        data=None)
 
 
-InvoiceLineItemRouter: APIRouter = create_crud_router(
-    model=LineItem,
-    create_schema=LineItemCreate,
-    read_schema=LineItemRead,
-    update_schema=LineItemUpdate,
-    prefix="/lineitem",
-    pk_field_name="id",
-    name_field="description",
-    filter_by_field="invoice_id"
-)
-InvoiceRouter.include_router(InvoiceLineItemRouter)
+
+

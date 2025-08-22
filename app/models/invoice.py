@@ -126,8 +126,11 @@ class Invoice(ParsedInvoiceDetails, SQLModel, table=True):
 
     invoice_image: Optional[Image] = Relationship(sa_relationship_kwargs={"cascade": "all, delete"})
     # two-way relationship to line item as there may be need to access invoice from line item and vice-versa
-    line_items: List['LineItem'] = Relationship(back_populates='invoice',
-                                                sa_relationship_kwargs={"cascade": "all, delete"})
+
+    line_items: List['LineItem'] = Relationship(
+        back_populates='invoice',
+        sa_relationship_kwargs={"cascade": "save-update, merge, delete, delete-orphan"}
+    )
 
     supplier: Optional[Supplier] = Relationship()  # todo - any need for a 2 way relationship here?
 
@@ -136,7 +139,7 @@ class LineItem(ParsedLineItem, SQLModel, table=True):
     Extends ParsedLineItem, to take the parsed data and add links to the parent invoice ID, line item ID etc
     """
     __tablename__ = 'lineitem'
-    id: Optional[int] = Field(primary_key=True, description="Line item ID")
+    id: Optional[int] = Field(primary_key=True, description="Line item ID", default=None)
     invoice_id: Optional[int] = Field(default=None, description='Reference to parent invoice ID', foreign_key="invoice.id")
     invoice: Optional[Invoice] = Relationship(back_populates="line_items")
     buyable_id: Optional[int] = Field(default=None, foreign_key="buyable.id") # these 3 fields are what downstream queries will use for costing calculations so need to be complete and accurate
@@ -144,48 +147,42 @@ class LineItem(ParsedLineItem, SQLModel, table=True):
     unit_cost: Optional[Decimal] = Field(default=None, max_digits=8, decimal_places=3)
     organisation_id: Optional[int] = Field(default=None, foreign_key="organisation.organisation_id")
 
-class LineItemRead(SQLModel):
-    id: Optional[int]
-    cases: Optional[int]
-    units: Optional[int]
-    description: Optional[str]
-    size: Optional[str]
-    code: Optional[str]
-    value_ex_vat: Optional[float]
-    value_inc_vat: Optional[float]
-    vat_percentage: Optional[float]
-    is_delivery: Optional[bool]
-    buyable_id: Optional[int]
-    buyable_quantity: Optional[Decimal]
-    unit_cost: Optional[Decimal]
-
-class LineItemUpdate(SQLModel):
+class LineItemBase(SQLModel):
+    invoice_id: Optional[int] = None
     cases: Optional[int] = None
-    units: Optional[int]= None
-    description: str= None
-    size: Optional[str]= None
-    code: Optional[str]= None
-    value_ex_vat: Optional[float]= None
-    value_inc_vat: Optional[float]= None
-    vat_percentage: Optional[float]= None
-    is_delivery: bool= False
+    units: Optional[int] = None
+    description: str
+    size: Optional[str] = None
+    code: Optional[str] = None
+    value_ex_vat: float
+    value_inc_vat: float
+    vat_percentage: float
+    is_delivery: bool = False
     buyable_id: Optional[int] = None
     buyable_quantity: Optional[Decimal] = None
     unit_cost: Optional[Decimal] = None
 
-class LineItemCreate(SQLModel):
-    cases: Optional[int]
-    units: Optional[int]
-    description: Optional[str]
-    size: Optional[str]
-    code: Optional[str]
-    value_ex_vat: Optional[float]
-    value_inc_vat: Optional[float]
-    vat_percentage: Optional[float]
-    is_delivery: Optional[bool]
-    buyable_id: Optional[int]
-    buyable_quantity: Optional[Decimal]
-    unit_cost: Optional[Decimal]
+class LineItemCreate(LineItemBase):
+    pass
+
+
+class LineItemRead(LineItemBase):
+    id: int
+
+class LineItemUpdate(SQLModel):
+    cases: Optional[int] = None
+    units: Optional[int] = None
+    description: Optional[str] = None
+    size: Optional[str] = None
+    code: Optional[str] = None
+    value_ex_vat: Optional[float] = None
+    value_inc_vat: Optional[float] = None
+    vat_percentage: Optional[float] = None
+    is_delivery: Optional[bool] = None
+    buyable_id: Optional[int] = None
+    buyable_quantity: Optional[Decimal] = None
+    unit_cost: Optional[Decimal] = None
+
 
 class InvoiceListResponse(SQLModel):
     """

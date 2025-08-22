@@ -11,6 +11,9 @@ DATABASE_URL = f"mysql+pymysql://{settings.USER}:{settings.PASSWORD}@{settings.H
 # the first time create_engine is called, a connection will be created.  Subsequent calls will use the existing engine if available
 # the underlying SQLAlchemy functionality takes care of connection pooling automatically
 engine = create_engine(DATABASE_URL)
+# ,
+#                        echo=True,
+#                        future=True) # logging turned on to debug new line item creation issue
 
 
 

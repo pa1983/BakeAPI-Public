@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
 try:
     settings = Settings()
-    logger.debug('Settings sucessfully loaded from .env')
+
 except Exception as e:
     msg = f'Error loading settings from .env file - confirm .env file is present'
     logger.warning(msg)

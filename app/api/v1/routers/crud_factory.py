@@ -83,7 +83,11 @@ def create_crud_router(
             user: User = Depends(get_current_user)
     ):
         try:
-            new_element = model.model_validate(form_data, update={'organisation_id': user.organisation_id})
+            # broken down into steps to debug
+            validated_data = form_data.model_dump()
+            validated_data['organisation_id'] = user.organisation_id
+            new_element = model.model_validate(validated_data)
+            # new_element = model.model_validate(form_data, update={'organisation_id': user.organisation_id})
             session.add(new_element)
             session.commit()
             session.refresh(new_element)
