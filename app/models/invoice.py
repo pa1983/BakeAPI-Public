@@ -154,9 +154,9 @@ class LineItemBase(SQLModel):
     description: str
     size: Optional[str] = None
     code: Optional[str] = None
-    value_ex_vat: float
-    value_inc_vat: float
-    vat_percentage: float
+    value_ex_vat: Optional[float] = 0
+    value_inc_vat: Optional[float] = 0
+    vat_percentage: Optional[float] = 0
     is_delivery: bool = False
     buyable_id: Optional[int] = None
     buyable_quantity: Optional[Decimal] = None
@@ -195,7 +195,7 @@ class InvoiceListResponse(SQLModel):
     supplier_name: str|None
     invoice_number: str|None
     status: InvoiceStatus
-    image: Image
+    image: Image | None
 
 class InvoiceRead(ParsedInvoiceDetails):
     id: int

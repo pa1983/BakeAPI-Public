@@ -75,9 +75,9 @@ def get_tokens_for_testing():
 
     if tokens:
 
-        print("ID Token:", tokens.get('IdToken'))
-        print("Access Token:", tokens.get('AccessToken'))
-        print("Refresh Token:", tokens.get('RefreshToken'))
+
+        print(tokens.get('AccessToken'))
+
     else:
         print("Failed to get tokens.")
 
