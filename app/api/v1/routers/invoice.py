@@ -4,12 +4,10 @@ from http import HTTPStatus
 
 from sqlalchemy.exc import IntegrityError as sqlalchemyIntegrityError
 from pymysql.err import IntegrityError as pymlsqlIntegrityError
-from fastapi import APIRouter, status, Depends, HTTPException, UploadFile, File, Form, Query, Body
-from fastapi_pagination import Page, paginate
-from fastapi_pagination.ext.sqlmodel import paginate as sqlmodel_paginate  # SQLModel-specific paginate
+from fastapi import APIRouter, status, Depends, HTTPException, UploadFile, File, Body
 
 from sqlalchemy.orm import selectinload
-from sqlmodel import Session, select, and_, or_
+from sqlmodel import Session, select, and_
 
 from app.api.v1.routers.crud_factory import create_crud_router
 from app.core.logging_config import logger
@@ -53,10 +51,12 @@ InvoiceLineItemRouter: APIRouter = create_crud_router(
 # include the lineitem router BEFORE other invoice endpoints so that the more specific endpoints of invoice/lineitem
 # are tried before the less specific invoice endpoints
 InvoiceRouter.include_router(InvoiceLineItemRouter)
+
+
 # prefix: /invoice
 
 
-@InvoiceRouter.get("/{invoice_id}/file_url")
+@InvoiceRouter.get("/{invoice_id}/file_url", response_model=ApiResponse[str])
 async def get_invoice_file_url(invoice_id: int,
                                session: Session = Depends(get_session),
                                user: User = Depends(get_current_user)):
@@ -77,14 +77,14 @@ async def get_invoice_file_url(invoice_id: int,
     ).first()
 
     if not doc_data:
-        return ApiResponse(status_code=HTTPStatus.NOT_FOUND, message="Invoice does not exist")
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Invoice does not exist")
     else:
         # get the psk
         logger.debug(f'generating psk link for image ID {doc_data.image_id} - {doc_data.s3_key}')
         filename: str = f'{doc_data.file_name}.{doc_data.file_ext}'
         s3_psk_url = s3_handler.get_psk(doc_data.s3_key, filename)
         logger.debug(s3_psk_url)
-        return ApiResponse(status_code=HTTPStatus.OK, message="Invoice Found", data=s3_psk_url)
+        return ApiResponse(message="Invoice Found", data=s3_psk_url)
 
 
 @InvoiceRouter.get("/new")
@@ -104,11 +104,12 @@ async def invoiceNew(session: Session = Depends(get_session), user: User = Depen
         session.add(empty_invoice)
         session.commit()
         session.refresh(empty_invoice)
-        response = ApiResponse(data=empty_invoice, message="New Invoice Created", status_code=200)
+        response = ApiResponse(data=empty_invoice, message="New Invoice Created")
     except Exception as e:
-        print(e)
-        return ApiResponse(data=None, message=f"Error creating new invoice", status_code=500)
+        logger.exception(e)
+        raise HTTPException(detail=f"Error creating new invoice", status_code=500)
     return response
+
 
 @InvoiceRouter.post("/")
 async def invoice_upload_post(file: UploadFile = File(...),
@@ -126,7 +127,6 @@ async def invoice_upload_post(file: UploadFile = File(...),
     try:
         file_bytes = await file.read()
 
-        # s3_key = s3_handler.push_UploadFile_to_s3(file, directory="invoice")
         s3_key = s3_handler.push_file_bytes_to_s3(file_bytes, directory="invoice")
         logger.debug(f"Invoice File pushed to S3: {s3_key}")
 
@@ -156,10 +156,11 @@ async def invoice_upload_post(file: UploadFile = File(...),
             invoice = parse_invoice(pdf_file_data_bytes=file_bytes, invoice_id=invoice.id,
                                     organisation_id=user.organisation_id)
         except Exception as e:
+            logger.exception(f"Could not parse invoice. Please upload file to try again. Error: {e}")
             raise HTTPException(HTTPStatus.INTERNAL_SERVER_ERROR,
-                                f"Could not parse invoice. Please upload file to try again. Error: {e}")
+                                f"Could not parse invoice. Please upload file to try again")
             # todo - is the built-in httpexception the right option here, or should i use a custome API Response with suitable status code?
-        return ApiResponse(data=invoice, message="Invoice uploaded successfully", status=200)
+        return ApiResponse(data=invoice, message="Invoice uploaded successfully")
 
     except Exception as e:
         session.rollback()
@@ -168,8 +169,9 @@ async def invoice_upload_post(file: UploadFile = File(...),
             delete_s3_object(image.s3_key)
         except Exception as e:
             pass  # tried and failed to delete - doesn't matter
+        logger.exception(f"Error uploading invoice file - please try again: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f"Error uploading invoice file - please try again: {e}")
+                            detail=f"Error uploading invoice file - please try again")
 
 
 @InvoiceRouter.get("/invoices")
@@ -228,7 +230,9 @@ async def get_invoice_form_data(session: Session = Depends(get_session),
     return ApiResponse(data=res, message="Invoice Form Data pulled")
 
 
-@InvoiceRouter.get("/{id}")
+@InvoiceRouter.get("/{id}",
+                   status_code=HTTPStatus.OK,
+                   response_model=ApiResponse[InvoiceRead])
 async def get_invoice(id: int, session: Session = Depends(get_session),
                       user: User = Depends(get_current_user)
                       ) -> ApiResponse[InvoiceRead | None]:
@@ -245,11 +249,11 @@ async def get_invoice(id: int, session: Session = Depends(get_session),
 
     )).first()
     response_model = InvoiceRead.model_validate(full_invoice_details, from_attributes=True)
-    res = ApiResponse(data=response_model, message=f'invoice {id} retrieved', status=HTTPStatus.OK)
+    res = ApiResponse(data=response_model, message=f'invoice {id} retrieved')
     return res
 
 
-@InvoiceRouter.delete("/{id}")
+@InvoiceRouter.delete("/{id}", status_code=HTTPStatus.ACCEPTED, response_model=ApiResponse[None])
 async def delete_invoice(id: int, session: Session = Depends(get_session),
                          user: User = Depends(get_current_user)
                          ) -> ApiResponse[None]:
@@ -279,19 +283,9 @@ async def delete_invoice(id: int, session: Session = Depends(get_session),
     except Exception as e:
         msg = f"Error deleting invoice {id} - changes rolled back and s3 object untouched"
         logger.exception(f"{msg} : {e}")
-        return ApiResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, message=msg, data=None)
-    return ApiResponse(status_code=HTTPStatus.NO_CONTENT, message=f"Invoice {id} deleted successfully", data=None)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg)
+    return ApiResponse(message=f"Invoice {id} deleted successfully", data=None)
 
-
-# @InvoiceRouter.patch("/lineitem/{id}")
-# async def update_invoice_line_item_field(data: updateDataModel,
-#                                          id: int, session: Session = Depends(get_session),
-#                                          user: User = Depends(get_current_user), ):
-#     line_item = session.exec(select(LineItem).join(Invoice).where(
-#         and_(LineItem.id == id, Invoice.organisation_id == user.organisation_id))).first()
-#     setattr(line_item, data.field_name, data.new_value)
-#     session.commit()
-#
 
 class InvoiceUpdate(BaseModel):
     """
@@ -332,12 +326,13 @@ async def update_invoice_field(
         select(Invoice).where(and_(Invoice.id == id, Invoice.organisation_id == user.organisation_id))).first()
     element_type = "Invoice"
     if not element_to_update:
-        return ApiResponse(status_code=status.HTTP_404_NOT_FOUND,
-                           message=f"Invoice with id {id} not found.", data=None)
+        logger.error(f"Invoice with id {id} not found. Update_invoice_field")
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Invoice with id {id} not found.")
 
     update_dict = update_data.model_dump(exclude_unset=True)
     if not update_dict:
-        return ApiResponse(status_code=status.HTTP_400_BAD_REQUEST, message="No update data provided.", data=None)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No update data provided.")
 
     for key, value in update_dict.items():
         setattr(element_to_update, key, value)
@@ -346,16 +341,12 @@ async def update_invoice_field(
         session.add(element_to_update)
         session.commit()
         session.refresh(element_to_update)
-    except (sqlalchemyIntegrityError, pymlsqlIntegrityError):
+    except (sqlalchemyIntegrityError, pymlsqlIntegrityError) as e:
         session.rollback()
-        return ApiResponse(status_code=status.HTTP_409_CONFLICT,
-                           message=f"Update failed. A {element_type} with that name may already exist.", data=None)
+        logger.exception(f"Update failed. A {element_type} with that name may already exist.{e}")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=f"Update failed. A {element_type} with that name may already exist.")
 
     print(update_data)
-    return ApiResponse(status_code=HTTPStatus.NO_CONTENT,
-                       message=f"invoice id {id}, updated",
+    return ApiResponse(message=f"invoice id {id}, updated",
                        data=None)
-
-
-
-

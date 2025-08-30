@@ -1,30 +1,8 @@
-#core/auth.py
-# testing cognito - get access token without using front end login for testing API endpoints
+
 from typing import Dict, Any
-
 import boto3
-from fastapi import Depends, status
-from sqlalchemy.orm import selectinload
-
-from app.models.user import User, Organisation
-from app.models.role import Role, RolePermissionLink
-from sqlmodel import Session, select
 from fastapi_cognito import CognitoAuth, CognitoSettings
-
 from app.core.config import settings
-from app.database.session import engine, get_session
-
-
-# Note the unused imports are required below to ensure that model classes are available for use by type checking when
-# classes are specified as string literals to avoid circular dependencies
-
-from app.models.ingredient import Ingredient, Ingredient_Image, IngredientRead
-from app.models.ingredient_image import *
-from app.models.uom import *
-from app.models.image import *
-from app.models.user import *
-from app.models.organisation import *
-from app.models.permission import Permission
 
 
 class MyCognitoSettings(CognitoSettings):
@@ -68,22 +46,25 @@ def get_cognito_tokens(client_id, username, password):
         return None
 
 
-def get_tokens_for_testing():
+def get_auth_token():
     tokens = get_cognito_tokens(settings.AWS_COGNITO_APP_CLIENT_ID,
                                 settings.AWS_COGNITO_TEST_USERNAME,
                                 settings.AWS_COGNITO_TEST_PASSWORD)
 
     if tokens:
 
-
+        access_token = tokens.get('AccessToken')
         print(tokens.get('AccessToken'))
+        return access_token
 
     else:
         print("Failed to get tokens.")
+        return None
+
 
 
 if __name__ == '__main__':
-    get_tokens_for_testing()
+    get_auth_token()
     # todo - figure out how to authorise in postman to avoid manually grabbing token
 # todo - write tests to ensure that the test username creates valid token.  Pass in invalid user and password to confirm auth rejects correctly also.
 

@@ -18,7 +18,6 @@ from app.api.v1.routers.recipe_ingredient import recipeIngredientRouter
 from app.api.v1.routers.recipe_labour import recipeLabourRouter
 from app.api.v1.routers.recipe_sub_recipe import recipeSubRecipe
 from app.core.logging_config import logger
-from app.api.v1.routers.admin import AdminRouter
 from app.api.v1.routers.common import CommonRouter
 from app.api.v1.routers.ingredient import IngredientRouter, IngredientImageRouter
 from app.api.v1.routers.user import UserRouter
@@ -65,7 +64,6 @@ app.add_middleware(
 # find by searching for all message= and remove and error/e instances
 
 app.include_router(CommonRouter, prefix="/common", tags=["Common"])
-app.include_router(AdminRouter, prefix="/admin", tags=["Admin"])
 app.include_router(IngredientRouter, prefix="/ingredient", tags=["Ingredient"])
 app.include_router(IngredientImageRouter, prefix="/ingredient_image", tags=["Ingredient Image"])
 app.include_router(UserRouter, prefix="/user", tags=["User"])
@@ -99,12 +97,3 @@ async def root():
 @app.get("/hello/{name}")
 async def say_hello(name: str):
     return {"message": f"Hello {name}"}
-
-
-@app.get("/protected-route-example", tags=["Protected"])
-async def protected_example(auth: CognitoToken = Depends(cognito_auth.auth_required)):
-    """
-    An example of a protected route requiring a Cognito token.
-    The 'Authorise' button should appear in the docs because of this dependency.
-    """
-    return {"message": f"You are authenticated, {auth.username}! Your email is {auth.cognito_id}"}

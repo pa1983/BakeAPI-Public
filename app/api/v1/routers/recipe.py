@@ -1,4 +1,5 @@
 from datetime import datetime
+from http.client import HTTPException
 from typing import List
 
 from fastapi import APIRouter, Depends, Query
@@ -43,12 +44,10 @@ async def get_recipe_cost_analysis(recipe_id: int,
         results: list[RecipeCostAnalysis] = get_recipe_cost_analysis(db_session, recipe_id, date_point,
                                                                      user.organisation_id)
         return ApiResponse(data=results,
-                           message=f"Recipe cost analysis retrieved successfully for recipe id {recipe_id}",
-                           status_code=200)
+                           message=f"Recipe cost analysis retrieved successfully for recipe id {recipe_id}")
     except Exception as e:
         logger.error(f"Error retrieving recipe cost analysis for recipe id {recipe_id}: {e}")
-        return ApiResponse(data=None, message=f"Error retrieving recipe cost analysis for recipe id {recipe_id}",
-                           status_code=500)
+        raise HTTPException(detail=f"Error retrieving recipe cost analysis for recipe id {recipe_id}")
 
 
 @recipeRouter.get("/{recipe_id}/elements",
@@ -67,7 +66,8 @@ async def get_recipe_elements(recipe_id: int,
     """
     recipe = session.get(Recipe, recipe_id)
     if not recipe:
-        return ApiResponse(data=[], message=f"Recipe with id {recipe_id} not found", status_code=404)
+        logger.error(f"Recipe with id {recipe_id} not found")
+        raise HTTPException(detail=f"Recipe with id {recipe_id} not found", status_code=404)
 
     ## todo - add user org checks here
     ingredients_query = select(RecipeIngredient).where(RecipeIngredient.recipe_id == recipe_id)
@@ -92,8 +92,7 @@ async def get_recipe_elements(recipe_id: int,
 
     sorted_list = sorted(combined_list, key=lambda element: element.data.sort_order)
 
-    return ApiResponse(data=sorted_list, message=f"Recipe elements retrieved successfully for recipe id {recipe_id}",
-                       status_code=200)
+    return ApiResponse(data=sorted_list, message=f"Recipe elements retrieved successfully for recipe id {recipe_id}")
 
 
 

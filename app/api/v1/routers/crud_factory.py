@@ -8,10 +8,11 @@ from sqlalchemy.exc import IntegrityError as sqlalchemyIntegrityError
 from pymysql.err import IntegrityError as pymlsqlIntegrityError
 from sqlmodel import Session, SQLModel, select, and_
 
-from fastapi import APIRouter, Depends, Body, Request, File, UploadFile, Path, Form
+from fastapi import APIRouter, Depends, Body, Request, File, UploadFile, Path, Form, HTTPException
 from starlette import status
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR, HTTP_400_BAD_REQUEST, HTTP_422_UNPROCESSABLE_ENTITY
 
+from app.core.logging_config import logger
 from app.database.session import get_session
 from app.dependencies.user_dependencies import get_current_user
 from app.models.common import ApiResponse
@@ -41,10 +42,9 @@ def parse_image_link_form_data(
     try:
         return ImageLinkCreate.model_validate_json(form_data_str)
     except ValidationError as e:
-        return ApiResponse(data=None, message="Error validating form data", status_code=HTTP_400_BAD_REQUEST)
+        logger.exception(e)
+        raise HTTPException(detail="Error validating form data", status_code=HTTP_400_BAD_REQUEST)
 
-
-## original approach - replaced above with function to pull in additional query options for nested querying
 
 def create_crud_router(
         *,
@@ -72,11 +72,16 @@ def create_crud_router(
     Creates and returns a FastAPI APIRouter with full CRUD functionality.
     Assumes the model has an 'organisation_id' field for multi-tenancy data separation.
     """
-    router = APIRouter(prefix=prefix, tags=tags)
+    router = APIRouter(prefix=prefix, tags=tags)  # todo - add a response model here to fully annotate the docs
     element_type = model.__name__
 
     # --- CREATE ---
-    @router.post("", response_model=ApiResponse[read_schema | None], status_code=status.HTTP_201_CREATED)
+    @router.post("", response_model=ApiResponse[read_schema | None],
+                 status_code=status.HTTP_201_CREATED,
+                 summary=f"Create a new {element_type}",
+                 description=f"""Create a new {element_type} in the database using schema *{create_schema}* 
+                 and return the new {element_type} as a JSON object with primary key name {pk_field_name}""",
+                 tags=tags)
     def create_new(
             form_data: create_schema = Body(...),
             session: Session = Depends(get_session),
@@ -85,29 +90,37 @@ def create_crud_router(
         try:
             # broken down into steps to debug
             validated_data = form_data.model_dump()
+            # Get the user's org_id from the user dependency and add it to the validated_data
             validated_data['organisation_id'] = user.organisation_id
             new_element = model.model_validate(validated_data)
-            # new_element = model.model_validate(form_data, update={'organisation_id': user.organisation_id})
             session.add(new_element)
             session.commit()
             session.refresh(new_element)
         except (sqlalchemyIntegrityError, pymlsqlIntegrityError) as e:
             session.rollback()
-            print(e, e.args)
-            return ApiResponse(status_code=status.HTTP_409_CONFLICT,
-                               message=f"{element_type} with that name or identifier already exists, or a foreign key does not exist.", data=None)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"{element_type} with that name or identifier already exists, or a foreign key does not exist.")
 
         except Exception as e:
             session.rollback()
             print(e, e.args)
-            return ApiResponse(status_code=status.HTTP_400_BAD_REQUEST, message=f"Error creating {element_type}: {e}",
-                               data=None)
+            logger.exception(e)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error creating {element_type}")
 
         return ApiResponse(data=read_schema.model_validate(new_element),
                            message=f"{element_type} created successfully.")
 
     # --- READ ALL (Updated to support optional filtering - initially to allow getting ingredient_buyable linked items from ingredient ID - ) ---
-    @router.get("/all", response_model=ApiResponse[List[read_schema]])
+    @router.get("/all",
+                response_model=ApiResponse[List[read_schema]],
+                summary=f"Get a list of all {element_type}s",
+                description=f"""Get a list of all {element_type}s in the database using schema *{read_schema}*.
+                            Primary key field name is {pk_field_name}.""",
+                tags=tags
+                )
     def get_all(
             request: Request,  # Added Request to access query params to get filter details, if present
             session: Session = Depends(get_session),
@@ -119,7 +132,7 @@ def create_crud_router(
             .where(getattr(model, 'organisation_id') == user.organisation_id)
         )
 
-        #  APPLY THE DYNAMIC FILTER IF CONFIGURED AND PROVIDED
+        #  APPLY THE DYNAMIC FILTER, IF CONFIGURED AND PROVIDED
         if filter_by_field:
             print(f'filtering by {filter_by_field}')
             # Check if a value for the filter field was passed in the URL query
@@ -141,31 +154,19 @@ def create_crud_router(
         if get_query_options:
             statement = statement.options(*get_query_options)
 
-        # print(f"statement: {statement}")
         elements = session.exec(statement).all()
         validated_elements = [read_schema.model_validate(el) for el in elements]
         return ApiResponse(data=validated_elements)
 
-    # # --- READ ALL (Updated) ---
-    # @router.get("/all", response_model=ApiResponse[List[read_schema]])
-    # def get_all(session: Session = Depends(get_session), user: User = Depends(get_current_user)):
-    #     statement = (
-    #         select(model)
-    #         .where(getattr(model, 'organisation_id') == user.organisation_id)
-    #         .order_by(getattr(model, name_field, None))
-    #     )
-    #
-    #     # --- APPLY CUSTOM OPTIONS ---
-    #     if get_query_options:
-    #         statement = statement.options(*get_query_options)
-    #
-    #     elements = session.exec(statement).all()
-    #     validated_elements = [read_schema.model_validate(el) for el in elements]
-    #     return ApiResponse(data=validated_elements)
-
-    # --- READ ONE (Updated) ---
-    @router.get("/{id}", response_model=ApiResponse[read_schema | None])
-    def get_by_id(id: int, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    @router.get("/{id}",
+                response_model=ApiResponse[read_schema | None],
+                summary=f"Get a single {element_type}",
+                description=f"""Get a single {element_type} by its primary key id (field name *{pk_field_name}*)
+                in the database using schema *{read_schema}*""",
+                tags=tags)
+    def get_by_id(id: int,
+                  session: Session = Depends(get_session),
+                  user: User = Depends(get_current_user)):
         statement = select(model).where(
             and_(getattr(model, pk_field_name) == id, getattr(model, 'organisation_id') == user.organisation_id)
         )
@@ -177,31 +178,42 @@ def create_crud_router(
         element = session.exec(statement).first()
 
         if not element:
-            return ApiResponse(status_code=status.HTTP_404_NOT_FOUND,
-                               message=f"{element_type} with id {id} not found.", data=None)
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail=f"{element_type} with id {id} not found.")
 
         return ApiResponse(data=read_schema.model_validate(element))
 
     # --- UPDATE (PATCH) ---
-    @router.patch("/{id}", response_model=ApiResponse[read_schema | None])
+    @router.patch("/{id}",
+                  response_model=ApiResponse[read_schema | None],
+                  status_code=status.HTTP_200_OK,
+                  summary=f"Update one or more field of {element_type}",
+                  description=f"""Update a {element_type} by its primary key id (field name *{pk_field_name}*)
+                    in the database using schema *{update_schema}*. 
+                    Updatable fields are: {[fieldname for fieldname in update_schema.model_fields]}""",
+                  tags=tags)
     def update_partial(
             id: int,
             update_data: update_schema = Body(...),
             session: Session = Depends(get_session),
             user: User = Depends(get_current_user)
     ):
+
         element_to_update = session.exec(
             select(model).where(
                 and_(getattr(model, pk_field_name) == id, getattr(model, 'organisation_id') == user.organisation_id))
         ).first()
 
         if not element_to_update:
-            return ApiResponse(status_code=status.HTTP_404_NOT_FOUND,
-                               message=f"{element_type} with id {id} not found.", data=None)
+            logger.error(f"Partial Update failed - {element_type} with id {id} not found.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail=f"{element_type} with id {id} not found.")
 
         update_dict = update_data.model_dump(exclude_unset=True)
         if not update_dict:
-            return ApiResponse(status_code=status.HTTP_400_BAD_REQUEST, message="No update data provided.", data=None)
+            logger.error("No update data provided to update_partial - update_dict is empty.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="No update data provided.")
 
         for key, value in update_dict.items():
             setattr(element_to_update, key, value)
@@ -210,29 +222,40 @@ def create_crud_router(
             session.add(element_to_update)
             session.commit()
             session.refresh(element_to_update)
-        except (sqlalchemyIntegrityError, pymlsqlIntegrityError):
+        except (sqlalchemyIntegrityError, pymlsqlIntegrityError) as e:
             session.rollback()
-            return ApiResponse(status_code=status.HTTP_409_CONFLICT,
-                               message=f"Update failed. A {element_type} with that name may already exist.", data=None)
+            logger.exception(f"Partial Update failed - {element_type} with id {id} already exists. {e}")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail=f"Update failed. A {element_type} with that name may already exist.")
 
         return ApiResponse(data=read_schema.model_validate(element_to_update),
                            message=f"{element_type} updated successfully.")
 
     # --- DELETE  ## conditionally checks for image_link_model to see if it also needs to remove matching image elements  ---
-    @router.delete("/{id}", response_model=ApiResponse[None])
-    def delete_by_id(id: int, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    # in hindsight this should default to status 204, but would break usages in front end that expect an ApiResponse with a message to flash
+    @router.delete("/{id}",
+                   response_model=ApiResponse[None],
+                   status_code=status.HTTP_200_OK,
+                   summary=f"Delete one {element_type}",
+                   description=f"""Delete a {element_type} by its primary key id (field name *{pk_field_name}*)""",
+                   tags=tags)
+
+    def delete_by_id(id: int,
+                     session: Session = Depends(get_session),
+                     user: User = Depends(get_current_user)):
         element_to_delete = session.exec(
             select(model).where(
                 and_(getattr(model, pk_field_name) == id, getattr(model, 'organisation_id') == user.organisation_id))
         ).first()
 
         if not element_to_delete:
-            return ApiResponse(status_code=status.HTTP_404_NOT_FOUND,
-                               message=f"{element_type} with id {id} not found.", data=None)
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail=f"{element_type} with id {id} not found.")
 
         image_to_delete_from_s3 = None
         if is_image_link_model and hasattr(element_to_delete,
-                                           'image_id'):  # the crud factory is dealing with a link table and needs to look for the Image table item referenced by the link table
+                                           'image_id'):
+            # the crud factory is dealing with a link table and needs to look for the Image table item referenced by the link table
             image_id = element_to_delete.image_id
             image_record = session.get(Image, image_id)
             if image_record:
@@ -243,21 +266,25 @@ def create_crud_router(
             session.delete(element_to_delete)  # try to delete the link table record
             session.commit()
 
-            # if db commits wre successful, also delete the S3 object to avoid orphaned data in S3
+            # if db commits were successful, also delete the S3 object to avoid orphaned data in S3
             if image_to_delete_from_s3:
                 s3_handler.delete_s3_object(image_to_delete_from_s3.s3_key)
 
         except Exception:
             session.rollback()
-            return ApiResponse(status_code=status.HTTP_409_CONFLICT,
-                               message=f"Could not delete {element_type} as it is likely in use.", data=None)
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                                detail=f"Could not delete {element_type} as it is likely in use.")
 
         return ApiResponse(message=f"{element_type} deleted successfully.")
 
     # conditionally attach an image upload endpoint to the router
     if attach_image_upload_endpoint:
         # Note the dynamic path using the parent's primary key field name
-        @router.post(f"/{{{pk_field_name}}}/image/upload", response_model=ApiResponse[None], tags=tags)
+        @router.post(f"/{pk_field_name}/image/upload",
+                     response_model=ApiResponse[None],
+                     status_code=status.HTTP_201_CREATED,
+                     summary=f"Upload an image to {element_type}",
+                     tags=tags)
         async def image_upload_post(
                 # The parent ID is now a path parameter.  DOn't need any form data at this point - can be added later if use wants to PATCH the field to add caption, alt_text etc
                 parent_id: int = Path(..., alias=pk_field_name),
@@ -274,18 +301,17 @@ def create_crud_router(
                 )
             ).first()
             if not parent_obj:
-                raise ApiResponse(status_code=404, message=f"{element_type} with id {parent_id} not found.", data=None)
+                raise HTTPException(status_code=404,
+                                    detail=f"{element_type} with id {parent_id} not found.")
 
             # This assumes a naming convention for the link table and its fields
             # E.g., for Ingredient, it expects Ingredient_Image model and 'ingredient_id' field.
             # A more advanced factory could take these as parameters.
             try:
-                # ... (The rest is the same as your original upload logic) ...
                 s3_key = s3_handler.push_UploadFile_to_s3(file, directory="image")
                 f = pathlib.Path(file.filename)
 
                 image = Image(
-                    # ... create image record  todo - create function to extract following elements from file object
                     file_name=f.stem,
                     file_ext=f.suffix,
                     mime_type=file.content_type,
@@ -296,13 +322,17 @@ def create_crud_router(
                 session.add(image)
                 session.flush()
 
-                link_data = {parent_fk_field: parent_id, "image_id": image.image_id, "organisation_id": user.organisation_id}
+                link_data = {parent_fk_field: parent_id,
+                             "image_id": image.image_id,
+                             "organisation_id": user.organisation_id}
                 new_link = image_link_model.model_validate(link_data)
                 session.add(new_link)
                 session.commit()
                 return ApiResponse(message="Image linked successfully.")
             except Exception as e:
                 session.rollback()
-                return ApiResponse(status_code=HTTP_422_UNPROCESSABLE_ENTITY, message=str(e), data=None)
+                logger.exception(f'error in crud factory image upload: {e}')
+                raise HTTPException(status_code=HTTP_422_UNPROCESSABLE_ENTITY,
+                                    detail="Error uploading image. Please try again.")
 
     return router

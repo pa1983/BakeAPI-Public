@@ -78,7 +78,7 @@ async def title_get(session: Session = Depends(get_session)) -> ApiResponse[List
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Currency table not found")
 
-    return ApiResponse(data=res, message="Currency list retrieved", status_code=HTTPStatus.OK)
+    return ApiResponse(data=res, message="Currency list retrieved")
 
 @CommonRouter.get("/supplier")
 async def get_invoice_form_data(session: Session = Depends(get_session),
@@ -123,7 +123,7 @@ async def file_upload_post(file: UploadFile = File(...)) -> ApiResponse[None]:
         delete_s3_object(s3_key)
         return ApiResponse(data=None, message=f"File uploaded successfully {file.filename} with s3 key {s3_key}")
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, message=f"Error uploading file: {e}")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Error uploading file: {e}")
 
 
 
@@ -135,12 +135,11 @@ async def get_product_type(session: Session = Depends(get_session),
     try:
         res = session.exec(select(ProductType)).all()
         return ApiResponse(data=res,
-                           message="Product Type list retrieved",
-                           status_code=HTTPStatus.OK)
+                           message="Product Type list retrieved")
     except Exception as e:
         logger.exception(f"Error retrieving product type table: {e}")
-        return ApiResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                           detail=f"Error retrieving product type table")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail=f"Error retrieving product type table")
 
 
 @CommonRouter.get('/recipe_type')
@@ -149,11 +148,10 @@ async def get_recipe_type(session: Session = Depends(get_session),
     try:
         res = session.exec(select(RecipeType)).all()
         return ApiResponse(data=res,
-                           message="Recipe Type list retrieved",
-                           status_code=HTTPStatus.OK)
+                           message="Recipe Type list retrieved")
     except Exception as e:
         logger.exception(f"Error retrieving recipe type table: {e}")
-        return ApiResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                            detail=f"Error retrieving recipe type table")
 
 @CommonRouter.get('/recipe_status')
@@ -162,9 +160,8 @@ async def get_recipe_status(session: Session = Depends(get_session),
     try:
         res = session.exec(select(RecipeStatus)).all()
         return ApiResponse(data=res,
-                           message="Recipe status list retrieved",
-                           status_code=HTTPStatus.OK)
+                           message="Recipe status list retrieved")
     except Exception as e:
         logger.exception(f"Error retrieving recipe status table: {e}")
-        return ApiResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                            detail=f"Error retrieving recipe status table")
