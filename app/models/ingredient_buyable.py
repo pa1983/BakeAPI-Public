@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional
-
-from sqlmodel import Field, Relationship, SQLModel, func
+from sqlalchemy import func
+from sqlmodel import Field, Relationship, SQLModel,UniqueConstraint
 
 # Forward references for relationships to be defined in other files
 # from .ingredient import Ingredient
@@ -42,6 +42,9 @@ class IngredientBuyable(IngredientBuyableBase, table=True):
         sa_column_kwargs={
             "onupdate": func.now()  # Corresponds to ON UPDATE CURRENT_TIMESTAMP
         },
+    )
+    __table_args__ = (
+        UniqueConstraint("ingredient_id", "buyable_id", name="uq_ingredient_buyable_link"),
     )
 
     # --- Relationships ---

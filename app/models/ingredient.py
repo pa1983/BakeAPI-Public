@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from pydantic import computed_field, ConfigDict
 from sqlalchemy import func
-from sqlmodel import SQLModel, Field, Relationship
+from sqlmodel import SQLModel, Field, Relationship, UniqueConstraint
 
 from app.models.ingredient_image import Ingredient_Image, Ingredient_ImageRead
 from app.models.organisation import Organisation, OrganisationRead
@@ -46,6 +46,9 @@ class Ingredient(IngredientBase, table=True):
         back_populates="ingredient"  # relates the name of the relationship on the Image model
     )
     recipe_links: List["RecipeIngredient"] = Relationship(back_populates="ingredient")
+    __table_args__ = (
+        UniqueConstraint("ingredient_name", "organisation_id", name="uorganisation_ingredient_ibfk"),
+    )
 
 
 class IngredientRead(IngredientBase):

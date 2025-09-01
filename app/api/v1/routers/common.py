@@ -92,27 +92,17 @@ async def get_invoice_form_data(session: Session = Depends(get_session),
                             detail="Supplier table not found")
     return suppliers
 
-
-@CommonRouter.get("/token")
-async def token_get(cognito_token=Depends(cognito_auth.auth_required)):
-    try:
-        res = cognito_token
-        return res
-    except Exception as e:
-        print(f"Error fetching units of measure: {e}")
-        # TODO: Add proper error handling, e.g., raise HTTPException
-
-
-@CommonRouter.get("/user_info", response_model=User)
-async def user_info(current_user: User = Depends(get_current_user),
-                    session: Session = Depends(get_session)):
-    # check i have access to the session here as a result of calling it within get current user
-
-    organisation = (session.exec(select(Organisation).
-                                 where(Organisation.organisation_id == current_user.organisation_id))
-                    .first())
-    print(f'Org name: {organisation.organisation_name}')
-    return current_user
+# todo - integrate user data viewer later - for now keep it out of the router.
+# @CommonRouter.get("/user_info", response_model=User)
+# async def user_info(current_user: User = Depends(get_current_user),
+#                     session: Session = Depends(get_session)):
+#     # check i have access to the session here as a result of calling it within get current user
+#
+#     organisation = (session.exec(select(Organisation).
+#                                  where(Organisation.organisation_id == current_user.organisation_id))
+#                     .first())
+#     print(f'Org name: {organisation.organisation_name}')
+#     return current_user
 
 # todo - make different versions for different file upload types.  Specific version for image, invoice, price list etc
 @CommonRouter.post("/file_upload")

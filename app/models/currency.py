@@ -12,6 +12,6 @@ class Currency(SQLModel, table=True):
     conversion_rate_to_base: decimal.Decimal = Field(
         max_digits=18, decimal_places=10
     )
-    symbol: str = Field(max_length=3)
+    symbol: Optional[str] = Field(max_length=3) # optional to avoid finding all the symbols for now...
 
 

@@ -250,6 +250,7 @@ def parse_invoice(pdf_file_data_bytes: bytes, invoice_id, organisation_id) -> In
         parse_start_time = time.perf_counter()
         logger.info("invoice parser initiated")
         gemini_response = send_invoice_to_gemini(pdf_file_data_bytes)
+
         runtime_ms = (time.perf_counter() - parse_start_time) * 1000
         parsed_invoice: ParsedInvoice = extract_gemini_response(gemini_response)
         # infer linked table fields - currency_code, supplier_id, line item buyable id

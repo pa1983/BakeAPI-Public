@@ -6,7 +6,7 @@ from app.models.ingredient import IngredientRead
 from app.models.ingredient_buyable import IngredientBuyableRead
 from app.models.ingredient_image import Ingredient_ImageRead
 from app.models.invoice import LineItemRead
-from app.models.labourer import LabourerRead #, LabourCategoryRead
+from app.models.labourer import LabourerRead
 from app.models.recipe import RecipeRead
 from app.models.recipe_ingredient import RecipeIngredientRead
 from app.models.recipe_labour import RecipeLabourRead
@@ -14,6 +14,15 @@ from app.models.recipe_sub_recipe import RecipeSubRecipeRead
 from app.models.supplier import SupplierRead
 
 from .CRUDConfig import CRUDConfig
+
+# it is impractical to create all the necessary test data for some endpoints for each test, so for some basic tables
+# we will pre-populate the database with sample entries that can be referenced in the config objects below
+TEST_INVOICE_ID = 64
+TEST_SUPPLIER_ID = 31
+TEST_BRAND_ID = 107
+TEST_LABOUR_CATEGORY_ID = 8
+
+
 
 # Existing config for /ingredient
 ingredient_config = CRUDConfig(
@@ -42,12 +51,11 @@ ingredient_buyable_config = CRUDConfig(
     update_payload={"notes": "Link ingredient to buyable - Modified"},
     check_field="notes",
     pk_field="id",
-    response_model=IngredientBuyableRead,
+    response_model=IngredientBuyableRead
+
 )
 
 # Config for /ingredient_image
-# NOTE: The Create schema for this endpoint does not include `ingredient_id`, which may be injected by the API logic.
-# The check_field is 'sort_order' as it's the main updatable, non-key field.
 ingredient_image_config = CRUDConfig(
     endpoint="/ingredient_image",
     create_payload={
@@ -64,7 +72,7 @@ ingredient_image_config = CRUDConfig(
 line_item_config = CRUDConfig(
     endpoint="/invoice/lineitem",
     create_payload={
-        "invoice_id": 1,
+        "invoice_id": TEST_INVOICE_ID,
         "description": "Test Line Item",
         "value_ex_vat": 100.0,
         "vat_percentage": 20.0
@@ -73,17 +81,18 @@ line_item_config = CRUDConfig(
     check_field="description",
     pk_field="id",
     response_model=LineItemRead,
+    check_unique=False
 )
 
 # Config for /buyable
 buyable_config = CRUDConfig(
     endpoint="/buyable",
     create_payload={
-        "brand_id": 1,
+        "brand_id": TEST_BRAND_ID,
         "sku": "TST-001",
         "item_name": "Test Buyable Item",
         "uom_id": 1,
-        "quantity": "1.0"
+        "quantity": "2000.0"
     },
     update_payload={"item_name": "Test Buyable Item - Modified"},
     check_field="item_name",
@@ -127,8 +136,8 @@ recipe_config = CRUDConfig(
         "recipe_type_id": 1,
         "product_type_id": 1,
         "recipe_status_id": 1,
-        "recipe_uom_id": 1,
-        "recipe_quantity": "500.0"
+        "recipe_uom_id": 9,  # defaults to pieces as most recipes are sold in pieces rather than grams
+        "recipe_quantity": "20.0"
     },
     update_payload={"recipe_name": "Test Recipe - Modified"},
     check_field="recipe_name",
@@ -150,6 +159,7 @@ recipe_ingredient_config = CRUDConfig(
     check_field="notes",
     pk_field="id",
     response_model=RecipeIngredientRead,
+    check_unique=False  # want to be able to add the same ingredient multiple times to the same recipe, e.g. flour for baking and more for dusting etc.
 )
 
 # Config for /labourer
@@ -165,7 +175,6 @@ labourer_config = CRUDConfig(
     response_model=LabourerRead,
 )
 
-
 # Config for /recipe_labour
 recipe_labour_config = CRUDConfig(
     endpoint="/recipe_labour",
@@ -173,13 +182,14 @@ recipe_labour_config = CRUDConfig(
         "recipe_id": 1,
         "labourer_id": 1,
         "labour_minutes": "30.0",
-        "labour_category_id": 1,
+        "labour_category_id": TEST_LABOUR_CATEGORY_ID,
         "description": "Initial mixing phase."
     },
     update_payload={"description": "Initial mixing phase - Modified"},
     check_field="description",
     pk_field="id",
     response_model=RecipeLabourRead,
+    check_unique=False
 )
 
 # Config for /recipe_sub_recipe
@@ -197,21 +207,28 @@ recipe_sub_recipe_config = CRUDConfig(
     check_field="notes",
     pk_field="id",
     response_model=RecipeSubRecipeRead,
+    check_unique=False
 )
 
-
 # Combine all configs into a single list for the test runner
-all_crud_configs = [
+generic_crud_configs = [
     ingredient_config,
-    ingredient_buyable_config,
-    # ingredient_image_config, # Potentially problematic, enable with caution.
     line_item_config,
     buyable_config,
     brand_config,
     supplier_config,
     recipe_config,
+    labourer_config
+]
+
+## add a list of dependent fixtures for each config?
+
+
+
+link_table_configs = [
+    ingredient_buyable_config,
+    ingredient_image_config,
     recipe_ingredient_config,
-    labourer_config,
     recipe_labour_config,
-    recipe_sub_recipe_config,
+    recipe_sub_recipe_config
 ]

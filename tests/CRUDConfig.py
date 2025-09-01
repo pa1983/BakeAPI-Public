@@ -37,6 +37,7 @@ class CRUDConfig:
     response_model: Type[SQLModel]
     # name of the pk id field
     pk_field: str = "id"
+    check_unique: bool = True # defaults to try as this will almost always be required, just needs excluded in rare cases
 
 
 

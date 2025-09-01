@@ -47,7 +47,7 @@ async def get_recipe_cost_analysis(recipe_id: int,
                            message=f"Recipe cost analysis retrieved successfully for recipe id {recipe_id}")
     except Exception as e:
         logger.error(f"Error retrieving recipe cost analysis for recipe id {recipe_id}: {e}")
-        raise HTTPException(detail=f"Error retrieving recipe cost analysis for recipe id {recipe_id}")
+        raise HTTPException(f"Error retrieving recipe cost analysis for recipe id {recipe_id}")
 
 
 @recipeRouter.get("/{recipe_id}/elements",

@@ -98,6 +98,8 @@ def create_crud_router(
             session.refresh(new_element)
         except (sqlalchemyIntegrityError, pymlsqlIntegrityError) as e:
             session.rollback()
+            # print(e, e.args)
+            # logger.exception(e)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"{element_type} with that name or identifier already exists, or a foreign key does not exist.")

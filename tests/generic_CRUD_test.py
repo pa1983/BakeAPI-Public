@@ -2,23 +2,24 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, text
 from app.database.session import engine
-from app.dependencies.user_dependencies import get_current_user
-from app.models.common import ApiResponse
-from main import app
-from .CRUDConfig import override_get_current_user, CRUDConfig
-from .test_ingredient import all_crud_configs
 
+from app.models.common import ApiResponse
+
+from .CRUDConfig import CRUDConfig
+from .test_configs import generic_crud_configs
+from .fixtures import client
 # set the dependency override to provide authentication and a sample user (the TEST user) to all tests
 
-app.dependency_overrides[get_current_user] = override_get_current_user
 
-def intial_tidy_up():
-    """Tidy up after tests are run to ensure there are no residual entries left behind from an earlier test suite that failed
-    as these could cause unexpected behaviour in subsequent tests."""
-    print("running tidy up")
-    with Session(engine) as session:
-        session.exec(text("DELETE i.* FROM ingredient i where organisation_id = 3;"))
-        session.commit()
+#
+# def intial_tidy_up():
+#     """Tidy up after tests are run to ensure there are no residual entries left behind from an earlier test suite that failed
+#     as these could cause unexpected behaviour in subsequent tests."""
+#     print("running tidy up")
+#     # todo - do i want this here?  will it throw off any fixtures?  shouldn't really be necessary if fixtures have worked?  but they could fail or stop early...
+#     with Session(engine) as session:
+#         session.exec(text("DELETE i.* FROM ingredient i where organisation_id = 3;"))
+#         session.commit()
 
 # Helper function to reduce repetition - checking ApiResponse object is repeated in all tests
 def assert_is_valid_api_response(response, expected_status: int, expected_data_model = None):
@@ -42,12 +43,7 @@ def assert_is_valid_api_response(response, expected_status: int, expected_data_m
         return None
 
 
-# Fixture provides the TestClient to all testa
-@pytest.fixture(scope="module")
-def client():
-    with TestClient(app) as tc:
-        intial_tidy_up()
-        yield tc
+
 
 @pytest.fixture
 def created_item(client: TestClient, config: CRUDConfig):
@@ -67,7 +63,7 @@ def created_item(client: TestClient, config: CRUDConfig):
 
 # The parametrize decorator iterates through the configs passed from all_crud_configs and makes each element
 # available as 'config' to all functions in the class
-@pytest.mark.parametrize("config", all_crud_configs)
+@pytest.mark.parametrize("config", generic_crud_configs)
 class TestGenericCRUD:
     """A Generic Test Suite for CRUD Endpoints"""
 
@@ -79,8 +75,11 @@ class TestGenericCRUD:
         assert getattr(data_object, config.check_field) == config.create_payload[config.check_field]
         item_id = getattr(data_object, config.pk_field)
         ## UNHAPPY PATH - CONFLICT ##
-        conflict_response = client.post(config.endpoint, json=config.create_payload)
-        assert_is_valid_api_response(conflict_response, 409)
+        if config.check_unique:
+            # in some instances, don't want to check for uniqueness, e.g. in invoice line items it's conceivable that
+            # the same item is legitimately repeated in the same invoice - so we skip this check in that case
+            conflict_response = client.post(config.endpoint, json=config.create_payload)
+            assert_is_valid_api_response(conflict_response, 409)
 
         # Cleanup the item created in this test
         client.delete(f'{config.endpoint}/{item_id}')

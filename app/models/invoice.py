@@ -66,7 +66,7 @@ class ParsedInvoiceDetails(SQLModel):
     parsed_currency: Optional[str] = Field(..., alias="currency", description="Currency in 3-character ISO 4217 code.")
     document_type: str = Field("invoice",
                                description="Type of duocument, e.g. invoice, packing_list, order_confirmation,receipt")
-    invoice_date: Optional[datetime] = Field(description="Date on which the invoice was created - must be converted to ISO date format.")
+    invoice_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Date on which the invoice was created - must be converted to ISO date format.")
     confidence_score: float = Field(default=0, alias="confidence_score",
                                     description="Confidence score from Gemini of confidence in accuracy of parsing of the invoice.")
 
@@ -115,7 +115,7 @@ class Invoice(ParsedInvoiceDetails, SQLModel, table=True):
 
     status: str = Field(default='processing', foreign_key="invoicestatus.name")
     invoice_status: InvoiceStatus = Relationship()
-    received_date: Optional[datetime] = Field(default=None, description="Date on which the physical order was received.")
+    received_date: Optional[datetime] = Field(default=datetime.now(), description="Date on which the physical order was received.")
     notes: Optional[str] = Field(description="Additional notes about the invoice or discrepancies within it")
     image_id: Optional[int] = Field(
         default=None,
@@ -208,8 +208,8 @@ class InvoiceRead(ParsedInvoiceDetails):
     notes: Optional[str]
     supplier_id: Optional[int]
     # Nested "Read" models for relationships
-    invoice_status: Optional[InvoiceStatus]
-    invoice_image: Optional[ImageInvoiceRead]
+    invoice_status: Optional[InvoiceStatus] = None
+    invoice_image: Optional[ImageInvoiceRead] = None
     line_items: List[LineItemRead] = []
 
 
