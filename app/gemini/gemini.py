@@ -163,7 +163,8 @@ def push_invoice_to_db(payload: InvoiceUpdatePayload, invoice_id: int) -> Invoic
 
             # Now, assign the new line items. SQLAlchemy will see these as new
             # objects to be added to the database and linked to the invoice.
-            new_line_items = [LineItem(**item.model_dump()) for item in payload.line_items]
+            # had to re-add org here - think I broke a connection when deleting a relationship to fix a circulare ref error in models
+            new_line_items = [LineItem(**item.model_dump(), organisation_id=existing_invoice.organisation_id) for item in payload.line_items]
             existing_invoice.line_items = new_line_items
 
             # 3. Update status and commit all changes
