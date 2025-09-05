@@ -54,10 +54,7 @@ class ImageBase(SQLModel):  # common elements that will be used in both the tabl
 
 
 class Image(ImageBase, table=True):  # inherit the image base
-    """
-    Represents an image entry in the database.
-    Stores metadata about an image, its path, and who uploaded it.
-    """
+
     image_id: Optional[int] = Field(default=None, primary_key=True)
 
     # define relationships to the TABLE as these can't be defined within the Base class
@@ -68,10 +65,7 @@ class Image(ImageBase, table=True):  # inherit the image base
 
 
 class ImageRead(ImageBase):
-    """
-    Pydantic model for exposing Image data in API responses.
-        Contains all API user-friendly data, excluding the relationship objects
-        """
+
     image_id: int
     model_config = ConfigDict(from_attributes=True)
 
@@ -85,9 +79,6 @@ class ImageRead(ImageBase):
         return f'{S3_BASE_URL}/{self.s3_key}'
 
 class ImageInvoiceRead(ImageBase):
-    """
-    Pydantic model for exposing Image data in API responses.
-        Contains all API user-friendly data, excluding the relationship objects
-        """
+
     image_id: int
     model_config = ConfigDict(from_attributes=True)

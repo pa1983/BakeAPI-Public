@@ -1,0 +1,123 @@
+{
+  "description": "container to allow for easy population of all data returned by gemini into model classes - will later be\nflattened before pushing to database tables",
+  "properties": {
+    "line_items": {
+      "items": {
+        "description": "Definition of invoice line item fields to be extracted by Gemini - fed into gemini to form the output schema",
+        "properties": {
+          "cases": {
+            "description": "Number of cases for the line item - synonyms: cartons, boxes.",
+            "type": "integer"
+          },
+          "units": {
+            "description": "Number of units for the line item - synonyms: pieces.",
+            "type": "integer"
+          },
+          "description": {
+            "description": "Description of the product or service. synonyms: title, desc, name",
+            "type": "string"
+          },
+          "size": {
+            "description": "Size or dimensions of the item. synonyms: pack size",
+            "type": "string"
+          },
+          "code": {
+            "description": "Product or item code. synonyms: sku, catalogue number",
+            "type": "string"
+          },
+          "value_ex_vat": {
+            "description": "Value of the line item excluding VAT to 2 decimal places.",
+            "type": "number"
+          },
+          "value_inc_vat": {
+            "description": "Value of the line item including VAT to 2 decimal places.",
+            "type": "number"
+          },
+          "vat_percentage": {
+            "description": "VAT percentage as a float (e.g., 0.20 for 20%).",
+            "type": "number"
+          },
+          "is_delivery": {
+            "description": "Whether the line item is delivery.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "description",
+          "value_ex_vat",
+          "value_inc_vat",
+          "vat_percentage"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "invoice_details": {
+      "description": "Definition of invoice meta fields to be extracted from the invoice by Gemini\nOnly fields to be extracted directly from the invoice by Gemini are included here.\nInclusion of extaneous fields, such as parsing time and token usage, would cause an increase in gemini token usage\nand runtime as the AI engine would look for these data in the parsed invoice",
+      "properties": {
+        "supplier_name": {
+          "description": "Name of the supplier.",
+          "type": "string"
+        },
+        "customer_account_number": {
+          "description": "Customers account number.",
+          "type": "string"
+        },
+        "invoice_number": {
+          "description": "Invoice number. synonyms: invoice ID",
+          "type": "string"
+        },
+        "user_reference": {
+          "description": "Users reference on the invoice.",
+          "type": "string"
+        },
+        "supplier_reference": {
+          "description": "Suppliers reference on the invoice.",
+          "type": "string"
+        },
+        "calculated_total": {
+          "description": "Sum of the total of all line items, taking into account the VAT rate for each line. This should be calculated from the extracted line items.",
+          "type": "number"
+        },
+        "invoice_total": {
+          "description": "The total invoice amount including VAT, as displayed on the invoice.",
+          "type": "number"
+        },
+        "delivery_cost": {
+          "description": "This may appear as a line item on the invoice with a carrier name such as DPD, royal mail, fed ex, ups or other delivery providers.Total delivery cost. Default to 0.0 if not found on invoice",
+          "type": "number"
+        },
+        "parsed_currency": {
+          "description": "Currency in 3-character ISO 4217 code.",
+          "type": "string"
+        },
+        "document_type": {
+          "description": "Type of duocument, e.g. invoice, packing_list, order_confirmation,receipt",
+          "type": "string"
+        },
+        "invoice_date": {
+          "description": "Date on which the invoice was created - must be converted to ISO date format.",
+          "format": "date-time",
+          "type": "string"
+        },
+        "confidence_score": {
+          "description": "Confidence score from Gemini of confidence in accuracy of parsing of the invoice.",
+          "type": "number"
+        }
+      },
+      "required": [
+        "invoice_number",
+        "calculated_total",
+        "invoice_total",
+        "delivery_cost",
+        "parsed_currency"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "line_items",
+    "invoice_details"
+  ],
+  "type": "object"
+}

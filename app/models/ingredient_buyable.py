@@ -3,16 +3,10 @@ from typing import Optional
 from sqlalchemy import func
 from sqlmodel import Field, Relationship, SQLModel,UniqueConstraint
 
-# Forward references for relationships to be defined in other files
-# from .ingredient import Ingredient
-# from .buyable import Buyable
 
 
 class IngredientBuyableBase(SQLModel):
-    """
-    Base model for the ingredient-buyable link.
-    Contains all fields that are provided upon creation.
-    """
+
     ingredient_id: int = Field(foreign_key="ingredient.ingredient_id")
     buyable_id: int = Field(foreign_key="buyable.id")
     sort_order: Optional[int] = Field(
@@ -23,9 +17,7 @@ class IngredientBuyableBase(SQLModel):
 
 
 class IngredientBuyable(IngredientBuyableBase, table=True):
-    """
-    Main database table model for the ingredient_buyable junction table.
-    """
+
     __tablename__ = "ingredient_buyable"
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -53,28 +45,18 @@ class IngredientBuyable(IngredientBuyableBase, table=True):
 
 
 class IngredientBuyableCreate(IngredientBuyableBase):
-    """
-    Model used for creating a new ingredient-buyable link via an API.
-    Identical to the Base model.
-    """
+
     pass
 
 
 class IngredientBuyableRead(IngredientBuyableBase):
-    """
-    Model for reading/returning an ingredient-buyable link from the API.
-    Includes all database-generated fields like id and timestamps.
-    """
+
     id: int
     created_timestamp: datetime.datetime
     modified_timestamp: datetime.datetime
 
 
 class IngredientBuyableUpdate(SQLModel):
-    """
-    Model for updating an existing ingredient-buyable link.
-    Contains only the fields that are user-modifiable. All fields are
-    optional to allow for partial updates (PATCH requests).
-    """
+
     sort_order: Optional[int] = None
     notes: Optional[str] = None

@@ -5,9 +5,6 @@ from logging.config import dictConfig
 
 import pythonjsonlogger  # import not required here, but is included to ensure it's included in requirements.txt to
 
-# allow logging setup below to work
-
-
 # logging config to json format the logs and push to stdout and stderr to allow them to be captured by docker containers
 # from the container they will be pushed to cloudwatch
 LOGGING_CONFIG = {

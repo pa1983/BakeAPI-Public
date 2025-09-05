@@ -32,29 +32,10 @@ from app.models.organisation import Organisation
 
 app = FastAPI(title="BakeAPI")
 
-# app.security_schemes = {
-#     "BearerAuth": {
-#         "type": "http",
-#         "scheme": "bearer",
-#         "bearerFormat": "JWT",
-#         "description": "Enter your Cognito JWT (Access Token or ID Token) in the format 'Bearer <token>'"
-#     }
-# }
-
-# app.add_middleware(
-#     RawContextMiddleware,  # used by fastapi-cognito to store and retrieve token info
-#     plugins=(
-#         plugins.RequestIdPlugin(),
-#         plugins.CorrelationIdPlugin()
-#     )
-# )
-
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5174",
-                   "https://bake.ardmillan.ie",
-                   "https://api.ardmillan.ie",],
+                   "https://bake.ardmillan.ie",],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]

@@ -33,10 +33,11 @@ GENERATION_CONFIG: dict = {
     "max_output_tokens": 20000,
     "response_mime_type": "application/json",
     "response_schema": GEMINI_SCHEMA,
-
 }
 
-MODEL = "gemini-2.5-flash-lite-preview-06-17"  # how will this change over time to match the current preview version?  need to call ListModels and find current relevant model
+MODEL = "gemini-2.5-flash-lite-preview-06-17"
+# TODO - consider how will this change over time to match the current preview version?
+#  need to call ListModels and find current relevant model
 
 # Define the tool during instantiation, then reuse in subsequent calls
 invoice_parser_tool = Tool(
@@ -50,7 +51,6 @@ invoice_parser_tool = Tool(
         )
     ]
 )
-
 
 def send_invoice_to_gemini(pdf_file_data_bytes: bytes):
     """
@@ -97,13 +97,10 @@ def extract_gemini_response(gemini_response):
     except (json.JSONDecodeError, AttributeError, IndexError) as e:
         logger.exception(f"Could not extract or parse JSON data - looks like an error in Gemini's output - invalid JSON-  Error: {e}")
         raise e
-        try:
-            logger.exception("gemini_response.text:  ", gemini_response.text)
-        except Exception:
-            logger.exception("Could not get gemini_response.text")
 
 
-def apply_db_schema_to_response_data(parsed_invoice: ParsedInvoice, invoice_id:int, organisation_id: int, runtime_ms: int|float, tokens_used: int) -> Invoice:
+def apply_db_schema_to_response_data(parsed_invoice: ParsedInvoice, invoice_id:int,
+                                     organisation_id: int, runtime_ms: int|float, tokens_used: int) -> Invoice:
     try:  # todo - get these data from the user's token data
         metadata = {
             "organisation_id": organisation_id,
@@ -127,30 +124,6 @@ def apply_db_schema_to_response_data(parsed_invoice: ParsedInvoice, invoice_id:i
     except Exception as e:
         logger.exception(f'error in apply_db_schema_to_response_data: {e}')
         raise e
-
-
-# def push_invoice_to_db(invoice_to_save: Invoice) -> Invoice:
-#     try:
-#         with db_session() as session:
-#             # get the existing invoice instance by ID
-#             existing_invoice = session.exec(select(Invoice).where(Invoice.id == invoice_to_save.id)).first()
-#
-#             for attr in [i for i in Invoice.model_fields if i != 'id']:
-#
-#                 val = getattr(invoice_to_save, attr)
-#                 if val:
-#                     # checking that val is not null prevents overwriting existing data by excluding fields set to None
-#                     setattr(existing_invoice, attr, val)
-#
-#             existing_invoice.status = 'draft'  # mark the updated invoice as status==draft (was processing)
-#             existing_invoice.line_items = invoice_to_save.line_items
-#             session.add(existing_invoice)
-#             session.commit()
-#             session.refresh(existing_invoice)
-#             return existing_invoice
-#     except Exception as e:
-#         logger.exception(f"Could not push invoice to database. Error: {e}--{existing_invoice}")
-#         raise e
 
 
 def push_invoice_to_db(payload: InvoiceUpdatePayload, invoice_id: int) -> Invoice:
@@ -178,7 +151,6 @@ def push_invoice_to_db(payload: InvoiceUpdatePayload, invoice_id: int) -> Invoic
 
                 if value is not None:
                     setattr(existing_invoice, key, value)
-
 
             # Explicitly delete each old line item from the session
             for old_item in existing_invoice.line_items:
@@ -244,7 +216,6 @@ def infer_supplier_id(supplier: str)-> int|None:
 
         return supplier_id
 
-
 def parse_invoice(pdf_file_data_bytes: bytes, invoice_id, organisation_id) -> Invoice|None:
     try:
         parse_start_time = time.perf_counter()
@@ -256,6 +227,7 @@ def parse_invoice(pdf_file_data_bytes: bytes, invoice_id, organisation_id) -> In
         # infer linked table fields - currency_code, supplier_id, line item buyable id
         currency_code = infer_currency_code(parsed_invoice.invoice_details.parsed_currency)
         supplier_id = infer_supplier_id(parsed_invoice.invoice_details.supplier_name)
+
 
         update_payload = InvoiceUpdatePayload(
             invoice_details = parsed_invoice.invoice_details,

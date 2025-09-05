@@ -52,9 +52,7 @@ InvoiceLineItemRouter: APIRouter = create_crud_router(
 # are tried before the less specific invoice endpoints
 InvoiceRouter.include_router(InvoiceLineItemRouter)
 
-
 # prefix: /invoice
-
 
 @InvoiceRouter.get("/{invoice_id}/file_url", response_model=ApiResponse[str])
 async def get_invoice_file_url(invoice_id: int,

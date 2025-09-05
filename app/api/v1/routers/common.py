@@ -69,9 +69,12 @@ async def title_get(session: Session = Depends(get_session)):
 
 @CommonRouter.get("/currency",
                   status_code=status.HTTP_200_OK,
-                  response_model=ApiResponse[List[Currency]])
+                  response_model=ApiResponse[List[Currency]],
+                  summary="Get a list of all currencies",
+                  description="Get a list of all currencies in the database using schema *Currency*."
+                              "Primary key field name is *currency_name*.")
 
-async def title_get(session: Session = Depends(get_session)) -> ApiResponse[List[Currency]]:
+async def get_currency(session: Session = Depends(get_session)) -> ApiResponse[List[Currency]]:
     try:
         res = session.exec(select(Currency).order_by(Currency.currency_name)).all()
     except Exception as e:

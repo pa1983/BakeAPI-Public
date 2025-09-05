@@ -53,7 +53,8 @@ def create_crud_router(
         read_schema: Type[ReadSchemaType],
         update_schema: Type[UpdateSchemaType],
         prefix: Optional[str] = "",
-        # keep here for future flexability, but mostly prefer to define prefix when using the router in main to make it easier to see in an overview where all the routers point to
+        # keep here for future flexibility, but mostly prefer to define prefix when
+        # using the router in main to make it easier to see in an overview where all the routers point to
         tags: List[str] = [],
         pk_field_name: str = "id",  # The name of the primary key column, defaults to 'id'
         name_field: str = "name",  # A common field for user-friendly messages and log outputs
@@ -61,9 +62,12 @@ def create_crud_router(
         # optionally allow for additional query options, e.g. for nested queries
         filter_by_field: Optional[str] = None,  # The field name to optionally filter the /all endpoint,
         image_link_model: Optional[Type[ModelType]] = None,
-        # if endpoint requires the option to upload images for the parent model, include an image link model to conditionally add delete all image links, images, and s3 objects when deleting the element
+        # if endpoint requires the option to upload images for the parent model,
+        # include an image link model to conditionally add delete all image links,
+        # images, and s3 objects when deleting the element
         parent_fk_field: Optional[str] = None,
-        # required if passing an image link model so it knows what the field name of parent is to link to (image pk name always the same)
+        # required if passing an image link model so it knows what the field
+        # name of parent is to link to (image pk name always the same)
         attach_image_upload_endpoint: bool = False,
         # flag to add a POST endpoint to upload an image and add to link table  at /{id}/image/upload
         is_image_link_model: bool = False
@@ -72,7 +76,7 @@ def create_crud_router(
     Creates and returns a FastAPI APIRouter with full CRUD functionality.
     Assumes the model has an 'organisation_id' field for multi-tenancy data separation.
     """
-    router = APIRouter(prefix=prefix, tags=tags)  # todo - add a response model here to fully annotate the docs
+    router = APIRouter(prefix=prefix, tags=tags)
     element_type = model.__name__
 
     # --- CREATE ---
@@ -98,8 +102,7 @@ def create_crud_router(
             session.refresh(new_element)
         except (sqlalchemyIntegrityError, pymlsqlIntegrityError) as e:
             session.rollback()
-            # print(e, e.args)
-            # logger.exception(e)
+            # No logging as this isn't a server error, just a user error
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"{element_type} with that name or identifier already exists, or a foreign key does not exist.")
@@ -134,12 +137,13 @@ def create_crud_router(
             .where(getattr(model, 'organisation_id') == user.organisation_id)
         )
 
-        #  APPLY THE DYNAMIC FILTER, IF CONFIGURED AND PROVIDED
+        #  APPLY THE DYNAMIC FILTER, IF  PROVIDED
         if filter_by_field:
             print(f'filtering by {filter_by_field}')
             # Check if a value for the filter field was passed in the URL query
             filter_value = request.query_params.get(
-                filter_by_field)  # check the params for a query fieldname matching the filter_by_field passed in.  If this doesn't match, all results will be returied
+                filter_by_field)  # check the params for a query fieldname matching the filter_by_field passed in.
+            #  If this doesn't match, all results will be returned
             if filter_value is not None:
                 try:
                     # Get the actual column attribute from the model
@@ -173,7 +177,7 @@ def create_crud_router(
             and_(getattr(model, pk_field_name) == id, getattr(model, 'organisation_id') == user.organisation_id)
         )
 
-        # --- APPLY CUSTOM OPTIONS ---
+
         if get_query_options:
             statement = statement.options(*get_query_options)
 
@@ -185,55 +189,91 @@ def create_crud_router(
 
         return ApiResponse(data=read_schema.model_validate(element))
 
-    # --- UPDATE (PATCH) ---
+
+    # the router watches for a PATCH operation on the base path and calls the update_partial method,
+    # making the {id} parameter available to the method.
     @router.patch("/{id}",
+                  # declaring the response_model here adds it to the openapi documentation; The model is an
+                  # ApiResponse object with the read_schema defined as the data field.
                   response_model=ApiResponse[read_schema | None],
+                  # The default status code for a successful PATCH operation.  204 No Content is often used for
+                  # PATCH responses, but it was decided to use 200 OK because the full updated object is being
+                  # returned in the response body so that it can be used to update local state in the frontend client.
                   status_code=status.HTTP_200_OK,
+                  # The summary and description are used in the openapi documentation.  The description makes use of
+                  # markup notation to make the documentation more user-friendly and lists all fields that can be
+                  # updated as a developer convenience.
                   summary=f"Update one or more field of {element_type}",
                   description=f"""Update a {element_type} by its primary key id (field name *{pk_field_name}*)
                     in the database using schema *{update_schema}*. 
                     Updatable fields are: {[fieldname for fieldname in update_schema.model_fields]}""",
                   tags=tags)
     def update_partial(
+            # id - passed in by the router decorator
             id: int,
+            # update_data is taken from the Body of the request, is typed with the update_schema type defined in the
+            # create_crud_router's signature. FastAPI will automatically parse the request body into this type
             update_data: update_schema = Body(...),
+            # The session provided by the Depends() is used to access the database
             session: Session = Depends(get_session),
+            # get_current_user dependency validated the user's Bearer token and makes the User object available to the method
             user: User = Depends(get_current_user)
     ):
-
+        # First get the element to update from the database using the id and user's organisation_id (this is the multi-tenancy protection)
         element_to_update = session.exec(
             select(model).where(
                 and_(getattr(model, pk_field_name) == id, getattr(model, 'organisation_id') == user.organisation_id))
         ).first()
-
+        # If an element isn't found, return a 404 error message and stop processing.
+        # HTTPException is a standard exception class in FastAPI that can be raised to directly return an error response to the client.
         if not element_to_update:
+            # the logger.error() method is used to log an error message using parameters from the parent function's definition,
+            # including the element's tye and ID.
             logger.error(f"Partial Update failed - {element_type} with id {id} not found.")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                                 detail=f"{element_type} with id {id} not found.")
 
+        # This step checks that the update data passed from the front end to the API complies with the update_data schema_requirements
+        # If a request attempts to patch a field that doesn't exist in the update_data schema, it will be silently excluded from the update_dict and ignored.
         update_dict = update_data.model_dump(exclude_unset=True)
+        # If the update_dict is empty, return a 400 error message and stop processing. This may happen even if the
+        # update body were not empty if the fields provided weren't present in the update_data schema.
         if not update_dict:
             logger.error("No update data provided to update_partial - update_dict is empty.")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                                 detail="No update data provided.")
 
+        # At this point it can be assumed that the data in update_dict is safe; so we iterate through the keys and values from the dictionary
+        # and update the corresponding attribute on the element_to_update object.
         for key, value in update_dict.items():
             setattr(element_to_update, key, value)
 
         try:
+            # The updated element is then added and commited to the database
             session.add(element_to_update)
             session.commit()
+            # The updated element is then refreshed to ensure that the database has updated the values.
+            # This ensures that the returned object is up-to-date with the database.
             session.refresh(element_to_update)
         except (sqlalchemyIntegrityError, pymlsqlIntegrityError) as e:
+            # If a database integrity error is thrown during the commit it indicates that the provided ID doesn't exist
+            # or that the data provided for a field doesn't match the database constraints.
             session.rollback()
-            logger.exception(f"Partial Update failed - {element_type} with id {id} already exists. {e}")
+            # log the full details error message using the logger.exception() method.
+            logger.exception(f"Partial Update failed - {element_type} with id {id} already exists or datatype doesn't match constraints {e}")
+            # raise an HTTPException to return a 409 Conflict error message to the client, with a descriptive error message.
+            # Note that the full exception details in e are NOT included as this risks leaking sensitive information
+            # and database/API structural information that could be used by a potential attacker.
             raise HTTPException(status_code=status.HTTP_409_CONFLICT,
-                                detail=f"Update failed. A {element_type} with that name may already exist.")
-
+                                detail=f"Update failed. A {element_type} with that name may already exist or the data type doesn't match constraints.")
+        # If this point is reached, the update was successful and the element_to_update object has been updated with the new data.
+        # The element to update is used to set a read_schema object and returned to the client.  This is used rather than returning the full
+        # model object to avoid returning sensitive information that should not be exposed to the client.
         return ApiResponse(data=read_schema.model_validate(element_to_update),
                            message=f"{element_type} updated successfully.")
 
-    # --- DELETE  ## conditionally checks for image_link_model to see if it also needs to remove matching image elements  ---
+    # --- DELETE
+    # ## conditionally checks for image_link_model to see if it also needs to remove matching image elements  ---
     # in hindsight this should default to status 204, but would break usages in front end that expect an ApiResponse with a message to flash
     @router.delete("/{id}",
                    response_model=ApiResponse[None],
@@ -288,14 +328,15 @@ def create_crud_router(
                      summary=f"Upload an image to {element_type}",
                      tags=tags)
         async def image_upload_post(
-                # The parent ID is now a path parameter.  DOn't need any form data at this point - can be added later if use wants to PATCH the field to add caption, alt_text etc
+                # The parent ID is now a path parameter.  Don't need any form data at this point -
+                # can be added later if use wants to PATCH the field to add caption, alt_text etc
                 parent_id: int = Path(..., alias=pk_field_name),
                 file: UploadFile = File(...),
                 # link_data: image_link_model = Depends(parse_image_link_form_data),  # todo - do i need to create a createLinkModel type for this? all link models should be exactly the same type - make all the SQLModel table=true definitions inherit from a generic model file to keep this accurate
                 session: Session = Depends(get_session),
                 user: User = Depends(get_current_user)
         ):
-            # Verify the parent object exists and belongs to the user's org
+            # Verify the parent object exists and belongs to the user's organisation
             parent_obj = session.exec(
                 select(model).where(
                     and_(getattr(model, pk_field_name) == parent_id,
@@ -308,9 +349,11 @@ def create_crud_router(
 
             # This assumes a naming convention for the link table and its fields
             # E.g., for Ingredient, it expects Ingredient_Image model and 'ingredient_id' field.
-            # A more advanced factory could take these as parameters.
             try:
+                # push the file to S3 and get the S3 key
                 s3_key = s3_handler.push_UploadFile_to_s3(file, directory="image")
+                # Use pathlib to parse the filename details - these are broken down in the image model to allow
+                # for filtering, sorting etc later
                 f = pathlib.Path(file.filename)
 
                 image = Image(
@@ -323,7 +366,7 @@ def create_crud_router(
                 )
                 session.add(image)
                 session.flush()
-
+                # An entry is created in the appropriate link table to link the image to the parent object
                 link_data = {parent_fk_field: parent_id,
                              "image_id": image.image_id,
                              "organisation_id": user.organisation_id}

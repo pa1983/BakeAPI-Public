@@ -89,7 +89,6 @@ class InvoiceUpdatePayload(SQLModel):
     parse_duration_ms: int
     parse_ai_tokens: int
     currency_code: str|None  # gemini will pull currency name, at this point we're trying to match currency to a currency code
-    supplier_id: int|None  # as above
 
 
 class Invoice(ParsedInvoiceDetails, SQLModel, table=True):

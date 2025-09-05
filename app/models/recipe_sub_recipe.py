@@ -10,11 +10,6 @@ if TYPE_CHECKING:
     from .uom import UnitOfMeasure, UnitOfMeasureRead
 
 
-# --------------------------------------------------------------------------------
-# BASE MODEL
-#
-# All common fields for the model, used for creation and reading.
-# --------------------------------------------------------------------------------
 class RecipeSubRecipeBase(SQLModel):
     """
     Base model for a sub-recipe link, containing all core fields.
@@ -44,11 +39,6 @@ class RecipeSubRecipeBase(SQLModel):
     sort_order: int = Field()
 
 
-# --------------------------------------------------------------------------------
-# DATABASE TABLE MODEL
-#
-# Represents the 'recipe_sub_recipe' table in the database.
-# --------------------------------------------------------------------------------
 class RecipeSubRecipe(RecipeSubRecipeBase, table=True):
     """
     Represents an entry in the recipe_sub_recipe join table.
@@ -62,17 +52,12 @@ class RecipeSubRecipe(RecipeSubRecipeBase, table=True):
         foreign_key="organisation.organisation_id"
     )
 
-    # --- Relationships ---
-    # It's assumed the 'Recipe' model will have 'sub_recipes' and 'parent_recipes'
-    # lists, and 'UnitOfMeasure' will have 'recipe_sub_recipes'.
 
-    # Relationship to the parent recipe ID
     parent_recipe: Optional["Recipe"] = Relationship(
         back_populates="sub_recipe_links",
         sa_relationship_kwargs={"foreign_keys": "[RecipeSubRecipe.parent_recipe_id]"}
     )
 
-    # Relationship to the sub-recipe (the recipe being treated as an ingredient in the parent recipe)
     sub_recipe: Optional["Recipe"] = Relationship(
         back_populates="parent_recipe_links",
         sa_relationship_kwargs={"foreign_keys": "[RecipeSubRecipe.sub_recipe_id]"}
@@ -81,11 +66,7 @@ class RecipeSubRecipe(RecipeSubRecipeBase, table=True):
     unit_of_measure: Optional["UnitOfMeasure"] = Relationship()
     organisation: "Organisation" = Relationship()
 
-# --------------------------------------------------------------------------------
-# PYDANTIC MODELS FOR API (CREATE, READ, UPDATE)
-#
-# These models are used for API validation and response formatting.
-# --------------------------------------------------------------------------------
+
 class RecipeSubRecipeCreate(RecipeSubRecipeBase):
     """
     Model for creating a new RecipeSubRecipe link via the API.

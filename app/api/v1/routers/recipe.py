@@ -64,12 +64,11 @@ async def get_recipe_elements(recipe_id: int,
     :param user:
     :return:
     """
-    recipe = session.get(Recipe, recipe_id)
+    recipe = session.get(Recipe, recipe_id).where(Recipe.organisation_id == user.organisation_id)
     if not recipe:
         logger.error(f"Recipe with id {recipe_id} not found")
         raise HTTPException(detail=f"Recipe with id {recipe_id} not found", status_code=404)
 
-    ## todo - add user org checks here
     ingredients_query = select(RecipeIngredient).where(RecipeIngredient.recipe_id == recipe_id)
     ingredients = session.exec(ingredients_query).all()
 

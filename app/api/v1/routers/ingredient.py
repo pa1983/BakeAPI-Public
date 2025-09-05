@@ -1,4 +1,4 @@
-# check if the org id is either a match to the user, or null (denoting a generic entry)
+
 import os
 
 from fastapi import APIRouter, status, Depends, HTTPException, UploadFile, File, Form, Query, Body
@@ -26,15 +26,6 @@ from app.models.user import *
 from app.models.organisation import *
 from app.services import s3_handler
 from app.dependencies.user_dependencies import get_current_user
-
-# /ingredient/
-# IngredientRouter: APIRouter = APIRouter()
-
-
-# todo - endpoints to implement:
-# ALL ingredients, paginated to avoid overloading front end if lats available
-# FILTER - by name, type, organisation-owned
-# both will return a list of IngredientRead
 
 IngredientRouter = create_crud_router(
     model=Ingredient,
@@ -71,72 +62,3 @@ IngredientImageRouter = create_crud_router(
     name_field="ingredient_name",
     is_image_link_model=True
 )
-
-
-
-
-#
-# #############IMAGE ENDPOINTS - special additions to the generic ingredient endpoints produced by the crud factory ####################
-# # todo - cosider nesting these further in their own .py file to keep code tidy - ingredient will be big enough
-# @IngredientRouter.post("/image/upload")
-# async def image_upload_post(file: UploadFile = File(...),
-#                             caption: str = Form(...),
-#                             alt_text: str = Form(...),
-#                             ingredient_id: int = Form(...),
-#                             session: Session = Depends(get_session),
-#                             user: User = Depends(get_current_user)
-#                             ) -> ApiResponse[None]:
-#     """
-#     Upload an image file to S3 and log necessary metadata to database.
-#     Build links to ingredients table
-#
-#     :param file: a FastAPI UploadFile instance
-#     :param caption:
-#     :param alt_text:
-#     :param ingredient_id:
-#     :param session:
-#     :param user:
-#     :return:
-#     """
-#     try:
-#         s3_key = s3_handler.push_UploadFile_to_s3(file, directory="image")  # todo - consider enum-ing this
-#         logger.debug(f"File pushed to S3: {s3_key}")
-#
-#         filename, extension = os.path.splitext(file.filename)
-#
-#         image = Image(
-#             file_name=filename,
-#             file_ext=extension,
-#             file_size=file.size,
-#             mime_type=file.content_type,
-#             alt_text=alt_text,
-#             caption=caption,
-#             organisation_id=user.organisation_id,
-#             s3_key=s3_key)
-#
-#         session.add(image)
-#         session.flush()  # flush in the image to get an ID for use in the link table
-#         logger.debug(image.image_id)
-#
-#         ingredient_image_link = Ingredient_Image(ingredient_id=ingredient_id,
-#                                                  image_id=image.image_id)
-#         session.add(ingredient_image_link)
-#         session.commit()
-#
-#         return ApiResponse(data=None, message=f"File uploaded successfully {file.filename} with s3 key {s3_key}")
-#     except Exception as e:
-#         session.rollback()
-#         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                             detail=f"Error uploading file - please try again: {e}")
-#
-#
-# @IngredientRouter.get("/image/delete")
-# async def image_delete_get(s3_object_key: str,
-#                            session: Session = Depends(get_session),
-#                            current_user: User = Depends(get_current_user)):
-#     # check that the user us linked to the image via organisation
-#     # delete the image
-#     s3_handler.delete_s3_object(s3_object_key)
-#     # delete related database objects: ingredient_image entry, image entry
-#
-#     # send 201 response
