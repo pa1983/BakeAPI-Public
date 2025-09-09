@@ -1,6 +1,8 @@
 from dotenv import find_dotenv, load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.logging_config import logger
+
 env_path = find_dotenv()
 if not env_path:
     print("Warning - no env_path found ")
@@ -26,6 +28,7 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str
     AWS_REGION: str
     S3_BUCKET_NAME: str
+    S3_BASE_URL: str
 
     # cognito user pool details
     AWS_COGNITO_USERPOOL_ID: str
@@ -33,12 +36,17 @@ class Settings(BaseSettings):
     AWS_COGNITO_TEST_USERNAME: str
     AWS_COGNITO_TEST_PASSWORD: str
 
+    GEMINI_API_KEY: str
+
     model_config = SettingsConfigDict(env_file=env_path, extra='ignore')
 
 try:
     settings = Settings()
+
 except Exception as e:
-    raise Exception(f'Error loading settings from .env file - confirm .env file is present')
+    msg = f'Error loading settings from .env file - confirm .env file is present'
+    logger.warning(msg)
+    raise Exception(msg)
 
 if __name__ == '__main__':
     for s in settings:

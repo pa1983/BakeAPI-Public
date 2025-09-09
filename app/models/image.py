@@ -1,13 +1,18 @@
 # image.py
-
-# from __future__ import annotations # Postpone evaluation of type hints to prevent circular import issues
-
 from datetime import datetime, timezone
 from typing import Optional, List
 
+from pydantic import ConfigDict, computed_field
 from sqlmodel import SQLModel, Field, Relationship
 
+from app.core.config import settings
+
+S3_BASE_URL = settings.S3_BASE_URL
+
 class ImageBase(SQLModel):  # common elements that will be used in both the table model and read model
+    """
+    Called ImageBase , but can be used for any documents being uploaded to S3
+    """
     file_name: str = Field(max_length=255, nullable=False)
     file_ext: str = Field(max_length=10, nullable=False, description='File extension')
     mime_type: str = Field(max_length=50, nullable=False)
@@ -38,6 +43,16 @@ class ImageBase(SQLModel):  # common elements that will be used in both the tabl
         description='Used as S3, or other cloud store, document key. UUID avoids need for checking if name already exists.'
     )
 
+    # @computed_field(property_name="image_url", return_schema={"type": "string"})
+    # @property
+    # def image_url(self) -> str:
+    #     """
+    #     Dynamically constructs the full image URL using the base S3 URL and the s3_key.
+    #     """
+    #     print('attempting to generate url')
+    #     return f'{S3_BASE_URL}/{self.s3_key}'
+
+
 class Image(ImageBase, table=True):  # inherit the image base
     """
     Represents an image entry in the database.
@@ -47,9 +62,9 @@ class Image(ImageBase, table=True):  # inherit the image base
 
     # define relationships to the TABLE as these can't be defined within the Base class
     organisation: Optional["Organisation"] = Relationship(back_populates="images")
-    # define relationship to the IngredientImage linking table
-    ingredient_links: List["Ingredient_Image"] = Relationship(back_populates="image")
-
+    # REMOVED THIS to make a one-way relationship from ingredient to allow use of Image table by invoice etc define relationship to the IngredientImage linking table
+    # ingredient_links: List["Ingredient_Image"] = Relationship(back_populates="image")
+    # todo - add links to other tables, e.g. invoices, pricelists etc
 
 
 class ImageRead(ImageBase):
@@ -58,6 +73,21 @@ class ImageRead(ImageBase):
         Contains all API user-friendly data, excluding the relationship objects
         """
     image_id: int
+    model_config = ConfigDict(from_attributes=True)
 
+    @computed_field(alias="image_url")
+    @property
+    def image_url(self) -> str:
+        """
+        Dynamically constructs the full image URL using the base S3 URL and the s3_key.
+        """
+        print('attempting to generate url')
+        return f'{S3_BASE_URL}/{self.s3_key}'
 
-
+class ImageInvoiceRead(ImageBase):
+    """
+    Pydantic model for exposing Image data in API responses.
+        Contains all API user-friendly data, excluding the relationship objects
+        """
+    image_id: int
+    model_config = ConfigDict(from_attributes=True)
