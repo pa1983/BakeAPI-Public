@@ -64,7 +64,7 @@ async def get_recipe_elements(recipe_id: int,
     :param user:
     :return:
     """
-    recipe = session.get(Recipe, recipe_id).where(Recipe.organisation_id == user.organisation_id)
+    recipe = session.get(Recipe, recipe_id)  # todo - need to an org check here for multitennancy
     if not recipe:
         logger.error(f"Recipe with id {recipe_id} not found")
         raise HTTPException(detail=f"Recipe with id {recipe_id} not found", status_code=404)
